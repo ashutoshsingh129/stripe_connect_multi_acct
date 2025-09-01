@@ -1,0 +1,25 @@
+{
+    "name": "stripe-connect-multi-acct",
+    "version": "1.0.0",
+    "description": "Stripe Connect Multi-Account Reporting Application",
+    "scripts": {
+        "build": "cd client && npm install && npm run build && cd ../server && npm install && npm run build",
+        "build:prod": "cd client && npm ci --only=production && npm run build && cd ../server && npm ci --include=dev && npm run build",
+        "start": "cd server && npm start",
+        "start:prod": "cd server && npm start",
+        "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm start\"",
+        "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+        "postinstall": "npm run build"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "dependencies": {
+        "@types/pg": "^8.15.5",
+        "officegen": "^0.6.5",
+        "xlsx-populate": "^1.21.0"
+    }
+}

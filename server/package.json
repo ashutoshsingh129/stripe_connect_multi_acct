@@ -1,0 +1,51 @@
+{
+    "name": "stripe-reporting-backend",
+    "version": "1.0.0",
+    "description": "Backend for Stripe Connect Reporting API",
+    "main": "dist/server.js",
+    "scripts": {
+        "start": "node dist/server.js",
+        "dev": "nodemon --exec ts-node server.ts",
+        "build": "tsc",
+        "build:watch": "tsc --watch",
+        "postinstall": "npm run build",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "stripe",
+        "reporting",
+        "api",
+        "express"
+    ],
+    "author": "Developer",
+    "license": "MIT",
+    "dependencies": {
+        "@types/archiver": "^6.0.3",
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.3",
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/node": "^24.2.1",
+        "@types/nodemailer": "^6.4.18",
+        "@types/pdfkit": "^0.17.2",
+        "@types/pg": "^8.15.5",
+        "archiver": "^7.0.1",
+        "bcryptjs": "^3.0.2",
+        "cors": "^2.8.5",
+        "dotenv": "^16.3.1",
+        "express": "^4.18.2",
+        "helmet": "^7.1.0",
+        "jsonwebtoken": "^9.0.2",
+        "moment": "^2.29.4",
+        "moment-timezone": "^0.5.43",
+        "nodemailer": "^6.10.1",
+        "pdfkit": "^0.17.1",
+        "pg": "^8.16.3",
+        "stripe": "^18.4.0",
+        "typescript": "^5.9.2",
+        "xlsx": "^0.18.5"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.10",
+        "ts-node": "^10.9.2"
+    }
+}

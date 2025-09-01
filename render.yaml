@@ -1,0 +1,46 @@
+services:
+    - type: web
+      name: stripe-connect-app
+      env: node
+      branch: deployment-multiple-users
+      buildCommand: npm install && npm run build:prod
+      startCommand: npm start
+      envVars:
+          - key: NODE_ENV
+            value: production
+          - key: PORT
+            value: 10000
+          - key: JWT_SECRET
+            generateValue: true
+          - key: PG_USER
+            sync: false
+          - key: PG_HOST
+            sync: false
+          - key: PG_DB
+            sync: false
+          - key: PG_PASS
+            sync: false
+          - key: PG_PORT
+            value: 5432
+          - key: SMTP_HOST
+            value: smtp.gmail.com
+          - key: SMTP_PORT
+            value: 587
+          - key: SMTP_USER
+            sync: false
+          - key: SMTP_PASS
+            sync: false
+          - key: DEFAULT_TIMEZONE
+            value: America/New_York
+          - key: CLIENT_URL
+            sync: false
+          - key: REACT_APP_API_URL
+            value: https://stripe-connect-multi-acct-1.onrender.com
+      healthCheckPath: /health
+      autoDeploy: true
+
+databases:
+    - name: stripe-connect-db
+      databaseName: stripe_connect_db
+      user: stripe_user
+      plan: free

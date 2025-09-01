@@ -1,0 +1,160 @@
+/* Additional component-specific styles */
+.MuiPaper-root.card {
+    margin-bottom: 24px;
+}
+
+.MuiTypography-h3 {
+    font-weight: 600 !important;
+}
+
+.MuiTypography-h5 {
+    font-weight: 500 !important;
+    color: #1976d2;
+}
+
+.MuiButton-contained {
+    text-transform: none !important;
+    font-weight: 500 !important;
+}
+
+.MuiTextField-root {
+    margin-bottom: 16px;
+}
+
+.MuiFormControl-root {
+    margin-bottom: 16px;
+}
+
+.MuiTable-root {
+    min-width: 800px;
+}
+
+.MuiTableCell-head {
+    font-weight: 600 !important;
+    background-color: #f5f5f5;
+}
+
+.MuiTableRow-hover:hover {
+    background-color: #f8f9fa !important;
+}
+
+.MuiCard-root.summary-card {
+    transition:
+        transform 0.2s ease-in-out,
+        box-shadow 0.2s ease-in-out;
+}
+
+.MuiCard-root.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.MuiIconButton-root {
+    transition: all 0.2s ease-in-out;
+}
+
+.MuiIconButton-root:hover {
+    transform: scale(1.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .MuiContainer-root {
+        padding: 16px !important;
+    }
+
+    .MuiGrid-container {
+        margin: 0 !important;
+    }
+
+    .MuiGrid-item {
+        padding: 8px !important;
+    }
+
+    .MuiTableContainer-root {
+        margin: 0 -16px;
+    }
+
+    .MuiTable-root {
+        min-width: 600px;
+    }
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+.loading .MuiCircularProgress-root {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Success/Error states */
+.MuiAlert-root {
+    margin-bottom: 16px;
+}
+
+/* Form field spacing */
+.form-section .MuiFormControl-root {
+    margin-bottom: 16px;
+}
+
+/* Button group spacing */
+.button-group .MuiButton-root {
+    margin-right: 12px;
+}
+
+.button-group .MuiButton-root:last-child {
+    margin-right: 0;
+}
+
+/* Pagination styles */
+.pagination-container {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.pagination-info {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pagination-page-info {
+    margin: 0 16px;
+    font-weight: 500;
+    color: #495057;
+}
+
+/* Responsive pagination */
+@media (max-width: 768px) {
+    .pagination-container {
+        flex-direction: column;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .pagination-controls {
+        order: 2;
+    }
+
+    .pagination-info {
+        order: 1;
+        text-align: center;
+    }
+}
