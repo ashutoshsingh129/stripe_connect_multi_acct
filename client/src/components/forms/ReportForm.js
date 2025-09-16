@@ -25,9 +25,9 @@ const ReportForm = ({
     formData,
     onFormChange,
     onGenerateReport,
+    onViewDetails,
     loading,
     timezones,
-
     accounts = [],
 }) => {
     const [selectedAccounts, setSelectedAccounts] = useState([]);
@@ -326,7 +326,7 @@ const ReportForm = ({
                     </Grid>
                 )}
 
-                {/* Generate Button */}
+                {/* Action Buttons */}
                 <Grid item xs={12}>
                     <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
                         {/* Progress indicator for large reports */}
@@ -353,24 +353,45 @@ const ReportForm = ({
                             </Box>
                         )}
 
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            size="large"
-                            onClick={onGenerateReport}
-                            disabled={
-                                loading ||
-                                selectedAccounts.length === 0 ||
-                                !formData.startDate ||
-                                !formData.endDate ||
-                                !formData.timezone ||
-                                !formData.secretKey ||
-                                !formData.publicKey
-                            }
-                            sx={{ minWidth: 200, py: 1.5 }}
-                        >
-                            {loading ? 'Generating...' : 'Generate Report'}
-                        </Button>
+                        <Box display="flex" gap={2} flexWrap="wrap" justifyContent="center">
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                size="large"
+                                onClick={onGenerateReport}
+                                disabled={
+                                    loading ||
+                                    selectedAccounts.length === 0 ||
+                                    !formData.startDate ||
+                                    !formData.endDate ||
+                                    !formData.timezone ||
+                                    !formData.secretKey ||
+                                    !formData.publicKey
+                                }
+                                sx={{ minWidth: 200, py: 1.5 }}
+                            >
+                                {loading ? 'Generating...' : 'Generate Report'}
+                            </Button>
+                            
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                size="large"
+                                onClick={onViewDetails}
+                                disabled={
+                                    loading ||
+                                    selectedAccounts.length === 0 ||
+                                    !formData.startDate ||
+                                    !formData.endDate ||
+                                    !formData.timezone ||
+                                    !formData.secretKey ||
+                                    !formData.publicKey
+                                }
+                                sx={{ minWidth: 200, py: 1.5 }}
+                            >
+                                View Details
+                            </Button>
+                        </Box>
                     </Box>
                 </Grid>
             </Grid>

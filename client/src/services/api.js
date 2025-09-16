@@ -57,6 +57,7 @@ export const API_ENDPOINTS = {
     // Reports
     TIMEZONES: '/api/reports/timezones',
     MULTI_REPORTS: accountIds => `/api/reports/multi/${accountIds}`,
+    DETAILED_TRANSACTIONS: accountIds => `/api/reports/detailed/${accountIds}`,
     ACCOUNTS: '/api/reports/accounts',
 
     // Export
@@ -136,6 +137,24 @@ export const apiService = {
             params,
             headers,
             timeout: 600000, // 10 minutes for multi-account report generation
+        });
+        return response.data;
+    },
+
+    // Detailed transactions function
+    getDetailedTransactions: async (accountIds, startDate, endDate, timezone, page = 1, limit = 25, headers) => {
+        const params = {
+            start_date: startDate,
+            end_date: endDate,
+            timezone,
+            period: 'custom',
+            page,
+            limit,
+        };
+        const response = await api.get(API_ENDPOINTS.DETAILED_TRANSACTIONS(accountIds), {
+            params,
+            headers,
+            timeout: 300000, // 5 minutes for detailed transaction queries
         });
         return response.data;
     },

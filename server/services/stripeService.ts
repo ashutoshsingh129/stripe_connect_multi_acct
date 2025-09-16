@@ -183,6 +183,138 @@ class StripeService {
         }
     }
 
+    // Get comprehensive transaction data including all endpoints
+    async getComprehensiveTransactions(
+        apiKey: string,
+        connectedAccountId: string,
+        startDate: string,
+        endDate: string,
+        timezone: string = 'UTC'
+    ): Promise<{
+        transactions: TransactionData[];
+        paymentIntents: Stripe.PaymentIntent[];
+        balanceTransactions: Stripe.BalanceTransaction[];
+        events: Stripe.Event[];
+        detailedRefunds: Stripe.Refund[];
+        detailedDisputes: Stripe.Dispute[];
+    }> {
+        try {
+            const userStripe = new Stripe(apiKey);
+
+            // Convert dates to Unix timestamps
+            const startTimestamp = moment.tz(startDate, timezone).unix();
+            const endTimestamp = moment.tz(endDate, timezone).unix();
+
+            // Get all data in parallel for better performance
+            const [
+                charges,
+                refunds,
+                chargebacks,
+                declines,
+                paymentIntents,
+                balanceTransactions,
+                events,
+                detailedRefunds,
+                detailedDisputes
+            ] = await Promise.all([
+                this.getCharges(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getRefunds(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getChargebacks(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getDeclines(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getPaymentIntents(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getBalanceTransactions(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getEvents(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getDetailedRefunds(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getDetailedDisputes(userStripe, connectedAccountId, startTimestamp, endTimestamp)
+            ]);
+
+            // Group transactions by date
+            const groupedTransactions = this.groupTransactionsByDate(
+                charges,
+                refunds,
+                chargebacks,
+                declines,
+                startDate,
+                endDate,
+                timezone,
+                connectedAccountId
+            );
+
+            return {
+                transactions: groupedTransactions,
+                paymentIntents,
+                balanceTransactions,
+                events,
+                detailedRefunds,
+                detailedDisputes
+            };
+        } catch (error) {
+            console.error('Error fetching comprehensive transactions:', error);
+            throw new Error(
+                `Failed to fetch comprehensive transactions: ${
+                    error instanceof Error ? error.message : 'Unknown error'
+                }`
+            );
+        }
+    }
+
+    // Get compliance-focused transaction data with fraud monitoring details
+    async getComplianceTransactions(
+        apiKey: string,
+        connectedAccountId: string,
+        startDate: string,
+        endDate: string,
+        timezone: string = 'UTC'
+    ): Promise<{
+        charges: Stripe.Charge[];
+        paymentIntents: Stripe.PaymentIntent[];
+        balanceTransactions: Stripe.BalanceTransaction[];
+        events: Stripe.Event[];
+        refunds: Stripe.Refund[];
+        disputes: Stripe.Dispute[];
+    }> {
+        try {
+            const userStripe = new Stripe(apiKey);
+
+            // Convert dates to Unix timestamps
+            const startTimestamp = moment.tz(startDate, timezone).unix();
+            const endTimestamp = moment.tz(endDate, timezone).unix();
+
+            // Get all data in parallel for better performance
+            const [
+                charges,
+                paymentIntents,
+                balanceTransactions,
+                events,
+                refunds,
+                disputes
+            ] = await Promise.all([
+                this.getCharges(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getPaymentIntents(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getBalanceTransactions(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getEvents(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getDetailedRefunds(userStripe, connectedAccountId, startTimestamp, endTimestamp),
+                this.getDetailedDisputes(userStripe, connectedAccountId, startTimestamp, endTimestamp)
+            ]);
+
+            return {
+                charges,
+                paymentIntents,
+                balanceTransactions,
+                events,
+                refunds,
+                disputes
+            };
+        } catch (error) {
+            console.error('Error fetching compliance transactions:', error);
+            throw new Error(
+                `Failed to fetch compliance transactions: ${
+                    error instanceof Error ? error.message : 'Unknown error'
+                }`
+            );
+        }
+    }
+
     // Get charges for a connected account
     private async getCharges(
         stripeInstance: Stripe,
@@ -345,6 +477,222 @@ class StripeService {
         }
 
         return declines;
+    }
+
+    // Get payment intents for a connected account
+    private async getPaymentIntents(
+        stripeInstance: Stripe,
+        connectedAccountId: string,
+        startTimestamp: number,
+        endTimestamp: number
+    ): Promise<Stripe.PaymentIntent[]> {
+        const paymentIntents: Stripe.PaymentIntent[] = [];
+        let hasMore = true;
+        let startingAfter: string | null = null;
+
+        while (hasMore) {
+            try {
+                const params: Stripe.PaymentIntentListParams = {
+                    limit: 100,
+                    created: {
+                        gte: startTimestamp,
+                        lte: endTimestamp,
+                    },
+                };
+
+                if (startingAfter) {
+                    params.starting_after = startingAfter;
+                }
+
+                const response = await stripeInstance.paymentIntents.list(params, {
+                    stripeAccount: connectedAccountId,
+                });
+
+                paymentIntents.push(...response.data);
+                hasMore = response.has_more;
+                startingAfter = response.data[response.data.length - 1]?.id || null;
+            } catch (error) {
+                console.error('Error fetching payment intents:', error);
+                hasMore = false;
+            }
+        }
+
+        return paymentIntents;
+    }
+
+    // Get balance transactions for a connected account
+    private async getBalanceTransactions(
+        stripeInstance: Stripe,
+        connectedAccountId: string,
+        startTimestamp: number,
+        endTimestamp: number
+    ): Promise<Stripe.BalanceTransaction[]> {
+        const balanceTransactions: Stripe.BalanceTransaction[] = [];
+        let hasMore = true;
+        let startingAfter: string | null = null;
+
+        while (hasMore) {
+            try {
+                const params: Stripe.BalanceTransactionListParams = {
+                    limit: 100,
+                    created: {
+                        gte: startTimestamp,
+                        lte: endTimestamp,
+                    },
+                };
+
+                if (startingAfter) {
+                    params.starting_after = startingAfter;
+                }
+
+                const response = await stripeInstance.balanceTransactions.list(params, {
+                    stripeAccount: connectedAccountId,
+                });
+
+                balanceTransactions.push(...response.data);
+                hasMore = response.has_more;
+                startingAfter = response.data[response.data.length - 1]?.id || null;
+            } catch (error) {
+                console.error('Error fetching balance transactions:', error);
+                hasMore = false;
+            }
+        }
+
+        return balanceTransactions;
+    }
+
+    // Get events for a connected account
+    private async getEvents(
+        stripeInstance: Stripe,
+        connectedAccountId: string,
+        startTimestamp: number,
+        endTimestamp: number
+    ): Promise<Stripe.Event[]> {
+        const events: Stripe.Event[] = [];
+        let hasMore = true;
+        let startingAfter: string | null = null;
+
+        while (hasMore) {
+            try {
+                const params: Stripe.EventListParams = {
+                    limit: 100,
+                    created: {
+                        gte: startTimestamp,
+                        lte: endTimestamp,
+                    },
+                    // Focus on payment-related events - get all events and filter later
+                    // Note: Stripe API only accepts single type, so we'll get all events
+                };
+
+                if (startingAfter) {
+                    params.starting_after = startingAfter;
+                }
+
+                const response = await stripeInstance.events.list(params, {
+                    stripeAccount: connectedAccountId,
+                });
+
+                // Filter for payment-related events
+                const paymentRelatedEvents = response.data.filter(event => 
+                    event.type.startsWith('charge.') ||
+                    event.type.startsWith('payment_intent.') ||
+                    event.type.startsWith('refund.') ||
+                    event.type.startsWith('dispute.') ||
+                    event.type.startsWith('balance.')
+                );
+
+                events.push(...paymentRelatedEvents);
+                hasMore = response.has_more;
+                startingAfter = response.data[response.data.length - 1]?.id || null;
+            } catch (error) {
+                console.error('Error fetching events:', error);
+                hasMore = false;
+            }
+        }
+
+        return events;
+    }
+
+    // Get detailed refunds for a connected account
+    private async getDetailedRefunds(
+        stripeInstance: Stripe,
+        connectedAccountId: string,
+        startTimestamp: number,
+        endTimestamp: number
+    ): Promise<Stripe.Refund[]> {
+        const refunds: Stripe.Refund[] = [];
+        let hasMore = true;
+        let startingAfter: string | null = null;
+
+        while (hasMore) {
+            try {
+                const params: Stripe.RefundListParams = {
+                    limit: 100,
+                    created: {
+                        gte: startTimestamp,
+                        lte: endTimestamp,
+                    },
+                };
+
+                if (startingAfter) {
+                    params.starting_after = startingAfter;
+                }
+
+                const response = await stripeInstance.refunds.list(params, {
+                    stripeAccount: connectedAccountId,
+                });
+
+                refunds.push(...response.data);
+                hasMore = response.has_more;
+                startingAfter = response.data[response.data.length - 1]?.id || null;
+            } catch (error) {
+                console.error('Error fetching detailed refunds:', error);
+                hasMore = false;
+            }
+        }
+
+        return refunds;
+    }
+
+    // Get detailed disputes for a connected account
+    private async getDetailedDisputes(
+        stripeInstance: Stripe,
+        connectedAccountId: string,
+        startTimestamp: number,
+        endTimestamp: number
+    ): Promise<Stripe.Dispute[]> {
+        const disputes: Stripe.Dispute[] = [];
+        let hasMore = true;
+        let startingAfter: string | null = null;
+
+        while (hasMore) {
+            try {
+                const params: Stripe.DisputeListParams = {
+                    limit: 100,
+                    created: {
+                        gte: startTimestamp,
+                        lte: endTimestamp,
+                    },
+                };
+
+                if (startingAfter) {
+                    params.starting_after = startingAfter;
+                }
+
+                const response = await stripeInstance.disputes.list(params, {
+                    stripeAccount: connectedAccountId,
+                });
+
+                disputes.push(...response.data);
+                hasMore = response.has_more;
+                startingAfter = response.data[response.data.length - 1]?.id || null;
+            } catch (error) {
+                console.error('Error fetching detailed disputes:', error);
+                hasMore = false;
+            }
+        }
+
+        return disputes;
     }
 
     // Group transactions by date and calculate daily summaries

@@ -21,6 +21,7 @@ import ExportButtons from '../export/ExportButtons';
 import EmailExportModal from '../export/EmailExportModal';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorMessage from '../common/ErrorMessage';
+import DetailedTransactionView from '../reports/DetailedTransactionView';
 
 const Dashboard = ({ user, onLogout }) => {
     // Form state
@@ -37,6 +38,10 @@ const Dashboard = ({ user, onLogout }) => {
 
     // Email export modal state
     const [emailModalOpen, setEmailModalOpen] = useState(false);
+
+    // Detailed transaction view state
+    const [showDetailedView, setShowDetailedView] = useState(false);
+    const [viewMode, setViewMode] = useState('report'); // 'report' or 'details'
 
     // Custom hooks
     const { timezones } = useTimezones();
@@ -123,6 +128,10 @@ const Dashboard = ({ user, onLogout }) => {
                 return;
             }
 
+            // Set view mode to report when generating reports
+            setViewMode('report');
+            setShowDetailedView(false);
+
             // Add keys to form data for the report generation
             const reportFormData = {
                 ...formData,
@@ -191,6 +200,19 @@ const Dashboard = ({ user, onLogout }) => {
         }
     };
 
+    // Handle View Details button from ReportForm
+    const handleViewDetails = () => {
+        setViewMode('details');
+        setShowDetailedView(true);
+        // Clear any existing report when switching to details view
+        setReport(null);
+    };
+
+    const handleCloseDetailedView = () => {
+        setShowDetailedView(false);
+        setViewMode('report');
+    };
+
     // Handle logout
     const handleLogout = async () => {
         try {
@@ -227,33 +249,36 @@ const Dashboard = ({ user, onLogout }) => {
                     Transaction Reports
                 </Typography>
                 <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
-                    Generate Standard Reports with charts and insights, or Detailed Reports with
-                    transaction data and export options
+                    Generate Standard Reports with charts and insights, or View Detailed Transactions with 
+                    compliance data and IP information
                 </Typography>
 
                 <ReportForm
                     formData={formData}
                     onFormChange={handleFormChange}
                     onGenerateReport={handleSubmit}
+                    onViewDetails={handleViewDetails}
                     loading={loading}
                     timezones={timezones}
                     accounts={accounts}
                 />
 
-                {/* Show Export Buttons even when no report exists */}
-                <ExportButtons
-                    onExportCSV={() => handleExport('csv')}
-                    onExportXLS={() => handleExport('xls')}
-                    onExportPDF={() => handleExport('pdf')}
-                    onEmailExport={handleEmailExport}
-                    onExportGoogleSheets={() => handleExport('sheets')}
-                    loading={exportLoading}
-                    hasReport={!!report}
-                    hasCredentials={!!formData.connectedAccountId}
-                />
+                {/* Show Export Buttons only when in report mode */}
+                {viewMode === 'report' && (
+                    <ExportButtons
+                        onExportCSV={() => handleExport('csv')}
+                        onExportXLS={() => handleExport('xls')}
+                        onExportPDF={() => handleExport('pdf')}
+                        onEmailExport={handleEmailExport}
+                        onExportGoogleSheets={() => handleExport('sheets')}
+                        loading={exportLoading}
+                        hasReport={!!report}
+                        hasCredentials={!!formData.connectedAccountId}
+                    />
+                )}
 
-                {/* Report Type Toggle - only show when report exists */}
-                {report && (
+                {/* Report Type Toggle - only show when report exists and in report mode */}
+                {viewMode === 'report' && report && (
                     <ReportToggle
                         reportType={reportType}
                         onReportTypeChange={handleReportTypeChange}
@@ -265,8 +290,8 @@ const Dashboard = ({ user, onLogout }) => {
                 {loading && <LoadingSpinner />}
                 {error && <ErrorMessage error={error} onClose={() => {}} />}
 
-                {/* Show Report Display only when report exists */}
-                {report && (
+                {/* Show Report Display only when report exists and in report mode */}
+                {viewMode === 'report' && report && (
                     <>
                         {reportType === 'standard' ? (
                             <StandardReport report={report} formData={formData} />
@@ -289,6 +314,17 @@ const Dashboard = ({ user, onLogout }) => {
                             />
                         )}
                     </>
+                )}
+
+                {/* Detailed Transaction View - show when in details mode */}
+                {viewMode === 'details' && showDetailedView && (
+                    <DetailedTransactionView
+                        accountIds={formData.connectedAccountId}
+                        startDate={formData.startDate}
+                        endDate={formData.endDate}
+                        timezone={formData.timezone}
+                        onClose={handleCloseDetailedView}
+                    />
                 )}
 
                 {/* Email Export Modal */}
