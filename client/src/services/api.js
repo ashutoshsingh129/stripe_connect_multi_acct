@@ -142,7 +142,7 @@ export const apiService = {
     },
 
     // Detailed transactions function
-    getDetailedTransactions: async (accountIds, startDate, endDate, timezone, page = 1, limit = 25, headers) => {
+    getDetailedTransactions: async (accountIds, startDate, endDate, timezone, page = 1, limit = 50, headers) => {
         const params = {
             start_date: startDate,
             end_date: endDate,

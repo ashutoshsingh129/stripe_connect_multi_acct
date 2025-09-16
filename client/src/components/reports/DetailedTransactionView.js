@@ -53,7 +53,7 @@ const DetailedTransactionView = ({
     const [error, setError] = useState(null);
     const [pagination, setPagination] = useState({
         currentPage: 1,
-        itemsPerPage: 25,
+        itemsPerPage: 50,
         totalItems: 0,
         totalPages: 0,
         hasPrevPage: false,
@@ -64,8 +64,10 @@ const DetailedTransactionView = ({
     const [filterRiskLevel, setFilterRiskLevel] = useState('all');
 
     // Fetch detailed transactions
-    const fetchDetailedTransactions = async (page = 1, limit = 25) => {
+    const fetchDetailedTransactions = async (page = 1, limit = 50) => {
         try {
+            console.log(`Fetching detailed transactions for accountIds: "${accountIds}"`);
+            
             if (page === 1) {
                 setLoading(true);
             } else {
@@ -99,6 +101,7 @@ const DetailedTransactionView = ({
             );
 
             if (response.success) {
+                console.log(`Detailed Transactions Response - Page: ${page}, Limit: ${limit}, Total: ${response.pagination.totalItems}, Current: ${response.pagination.currentPage}`);
                 setTransactions(response.data);
                 setPagination(response.pagination);
             } else {
@@ -502,7 +505,7 @@ const DetailedTransactionView = ({
                         <Tooltip title="First Page">
                             <IconButton
                                 onClick={() => handlePageChange(1)}
-                                disabled={!pagination.hasPrevPage || paginationLoading}
+                                disabled={pagination.currentPage === 1 || paginationLoading}
                             >
                                 <FirstPageIcon />
                             </IconButton>
@@ -526,7 +529,7 @@ const DetailedTransactionView = ({
                         <Tooltip title="Last Page">
                             <IconButton
                                 onClick={() => handlePageChange(pagination.totalPages)}
-                                disabled={!pagination.hasNextPage || paginationLoading}
+                                disabled={pagination.currentPage === pagination.totalPages || paginationLoading}
                             >
                                 <LastPageIcon />
                             </IconButton>
