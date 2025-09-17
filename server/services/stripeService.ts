@@ -322,6 +322,9 @@ class StripeService {
         startTimestamp: number,
         endTimestamp: number
     ): Promise<Stripe.Charge[]> {
+        console.log(`🔍 Fetching charges for account ${connectedAccountId}`);
+        console.log(`📅 Date range: ${new Date(startTimestamp * 1000)} to ${new Date(endTimestamp * 1000)}`);
+        
         const charges: Stripe.Charge[] = [];
         let hasMore = true;
         let startingAfter: string | null = null;
@@ -340,19 +343,43 @@ class StripeService {
                     params.starting_after = startingAfter;
                 }
 
+                console.log(`📡 Stripe API call - charges.list for ${connectedAccountId}:`, params);
                 const response = await stripeInstance.charges.list(params, {
                     stripeAccount: connectedAccountId,
                 });
+
+                console.log(`✅ Charges response for ${connectedAccountId}: ${response.data.length} charges found`);
+                if (response.data.length > 0) {
+                    console.log(`📋 Sample charge IDs:`, response.data.slice(0, 3).map(c => c.id));
+                }
 
                 charges.push(...response.data);
                 hasMore = response.has_more;
                 startingAfter = response.data[response.data.length - 1]?.id || null;
             } catch (error) {
-                console.error('Error fetching charges:', error);
+                console.error(`❌ Error fetching charges for ${connectedAccountId}:`, error);
                 hasMore = false;
             }
         }
 
+        console.log(`📊 Total charges found for ${connectedAccountId}: ${charges.length}`);
+        
+        // If no charges found, let's check if there are ANY charges in this account (without date filter)
+        if (charges.length === 0) {
+            console.log(`🔍 No charges found in date range. Checking if account has ANY charges...`);
+            try {
+                const testResponse = await stripeInstance.charges.list({ limit: 5 }, {
+                    stripeAccount: connectedAccountId,
+                });
+                console.log(`📋 Account ${connectedAccountId} has ${testResponse.data.length} total charges (any date)`);
+                if (testResponse.data.length > 0) {
+                    console.log(`📅 Sample charge dates:`, testResponse.data.map(c => new Date(c.created * 1000).toISOString()));
+                }
+            } catch (error) {
+                console.error(`❌ Error checking total charges for ${connectedAccountId}:`, error);
+            }
+        }
+        
         return charges;
     }
 
@@ -486,6 +513,9 @@ class StripeService {
         startTimestamp: number,
         endTimestamp: number
     ): Promise<Stripe.PaymentIntent[]> {
+        console.log(`🔍 Fetching payment intents for account ${connectedAccountId}`);
+        console.log(`📅 Date range: ${new Date(startTimestamp * 1000)} to ${new Date(endTimestamp * 1000)}`);
+        
         const paymentIntents: Stripe.PaymentIntent[] = [];
         let hasMore = true;
         let startingAfter: string | null = null;
@@ -504,19 +534,43 @@ class StripeService {
                     params.starting_after = startingAfter;
                 }
 
+                console.log(`📡 Stripe API call - paymentIntents.list for ${connectedAccountId}:`, params);
                 const response = await stripeInstance.paymentIntents.list(params, {
                     stripeAccount: connectedAccountId,
                 });
+
+                console.log(`✅ PaymentIntents response for ${connectedAccountId}: ${response.data.length} payment intents found`);
+                if (response.data.length > 0) {
+                    console.log(`📋 Sample payment intent IDs:`, response.data.slice(0, 3).map(pi => pi.id));
+                }
 
                 paymentIntents.push(...response.data);
                 hasMore = response.has_more;
                 startingAfter = response.data[response.data.length - 1]?.id || null;
             } catch (error) {
-                console.error('Error fetching payment intents:', error);
+                console.error(`❌ Error fetching payment intents for ${connectedAccountId}:`, error);
                 hasMore = false;
             }
         }
 
+        console.log(`📊 Total payment intents found for ${connectedAccountId}: ${paymentIntents.length}`);
+        
+        // If no payment intents found, let's check if there are ANY payment intents in this account (without date filter)
+        if (paymentIntents.length === 0) {
+            console.log(`🔍 No payment intents found in date range. Checking if account has ANY payment intents...`);
+            try {
+                const testResponse = await stripeInstance.paymentIntents.list({ limit: 5 }, {
+                    stripeAccount: connectedAccountId,
+                });
+                console.log(`📋 Account ${connectedAccountId} has ${testResponse.data.length} total payment intents (any date)`);
+                if (testResponse.data.length > 0) {
+                    console.log(`📅 Sample payment intent dates:`, testResponse.data.map(pi => new Date(pi.created * 1000).toISOString()));
+                }
+            } catch (error) {
+                console.error(`❌ Error checking total payment intents for ${connectedAccountId}:`, error);
+            }
+        }
+        
         return paymentIntents;
     }
 

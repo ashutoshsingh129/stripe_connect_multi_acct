@@ -16,12 +16,15 @@ const ExportButtons = ({
     loading,
     hasReport,
     hasCredentials,
+    hideHeader = false,
 }) => {
-    return (
-        <Paper elevation={2.5} sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-                Export Options
-            </Typography>
+    const content = (
+        <>
+            {!hideHeader && (
+                <Typography variant="h6" gutterBottom>
+                    Export Options
+                </Typography>
+            )}
 
             {/* Show different messaging based on whether report exists */}
             {!hasReport ? (
@@ -148,6 +151,16 @@ const ExportButtons = ({
                     </Typography>
                 )}
             </Box>
+        </>
+    );
+
+    if (hideHeader) {
+        return content;
+    }
+
+    return (
+        <Paper elevation={2.5} sx={{ p: 3, mb: 3 }}>
+            {content}
         </Paper>
     );
 };

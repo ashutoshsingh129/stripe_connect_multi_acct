@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, AppBar, Toolbar, Button, Box } from '@mui/material';
+import { Container, Typography, AppBar, Toolbar, Button, Box, ToggleButton, ToggleButtonGroup, Chip, Paper } from '@mui/material';
 import { format } from 'date-fns';
 
 // Custom hooks
@@ -38,10 +38,12 @@ const Dashboard = ({ user, onLogout }) => {
 
     // Email export modal state
     const [emailModalOpen, setEmailModalOpen] = useState(false);
+    const [emailExportType, setEmailExportType] = useState('regular'); // 'regular' or 'detailed'
 
     // Detailed transaction view state
     const [showDetailedView, setShowDetailedView] = useState(false);
     const [viewMode, setViewMode] = useState('report'); // 'report' or 'details'
+    const [detailedViewLoading, setDetailedViewLoading] = useState(false);
 
     // Custom hooks
     const { timezones } = useTimezones();
@@ -54,6 +56,7 @@ const Dashboard = ({ user, onLogout }) => {
         error,
         generateReport,
         exportReport,
+        exportDetailedTransactions,
     } = useReport();
 
     // Load Stripe Connect accounts when component mounts
@@ -169,6 +172,7 @@ const Dashboard = ({ user, onLogout }) => {
     // Handle email export
     const handleEmailExport = () => {
         setEmailModalOpen(true);
+        setEmailExportType('regular'); // Set flag for regular export
     };
 
     // Handle email export submission
@@ -193,6 +197,56 @@ const Dashboard = ({ user, onLogout }) => {
         }
     };
 
+    // Handle detailed transaction export
+    const handleDetailedExport = async format => {
+        try {
+            const { publicKey, secretKey } = getStripeKeys();
+            if (!publicKey || !secretKey) {
+                console.error('Stripe keys not found');
+                return;
+            }
+
+            const exportFormData = {
+                ...formData,
+                publicKey,
+                secretKey,
+            };
+
+            await exportDetailedTransactions(exportFormData, format);
+        } catch (error) {
+            console.error('Failed to export detailed transactions:', error);
+        }
+    };
+
+    // Handle detailed transaction email export
+    const handleDetailedEmailExport = () => {
+        setEmailModalOpen(true);
+        setEmailExportType('detailed'); // Set flag for detailed export
+    };
+
+    // Handle detailed transaction email export submission
+    const handleDetailedEmailExportSubmit = async email => {
+        try {
+            const { publicKey, secretKey } = getStripeKeys();
+            if (!publicKey || !secretKey) {
+                console.error('Stripe keys not found');
+                return;
+            }
+
+            const exportFormData = {
+                ...formData,
+                publicKey,
+                secretKey,
+            };
+
+            await exportDetailedTransactions(exportFormData, 'email', email);
+            setEmailModalOpen(false);
+            setEmailExportType('regular'); // Reset flag
+        } catch (error) {
+            console.error('Failed to export detailed transactions via email:', error);
+        }
+    };
+
     // Handle report type toggle
     const handleReportTypeChange = (event, newReportType) => {
         if (newReportType !== null) {
@@ -201,11 +255,18 @@ const Dashboard = ({ user, onLogout }) => {
     };
 
     // Handle View Details button from ReportForm
-    const handleViewDetails = () => {
-        setViewMode('details');
-        setShowDetailedView(true);
-        // Clear any existing report when switching to details view
-        setReport(null);
+    const handleViewDetails = async () => {
+        try {
+            setDetailedViewLoading(true);
+            setViewMode('details');
+            setShowDetailedView(true);
+            // Clear any existing report when switching to details view
+            setReport(null);
+        } catch (error) {
+            console.error('Failed to load detailed view:', error);
+        } finally {
+            setDetailedViewLoading(false);
+        }
     };
 
     const handleCloseDetailedView = () => {
@@ -259,22 +320,73 @@ const Dashboard = ({ user, onLogout }) => {
                     onGenerateReport={handleSubmit}
                     onViewDetails={handleViewDetails}
                     loading={loading}
+                    detailedViewLoading={detailedViewLoading}
                     timezones={timezones}
                     accounts={accounts}
                 />
 
-                {/* Show Export Buttons only when in report mode */}
-                {viewMode === 'report' && (
-                    <ExportButtons
-                        onExportCSV={() => handleExport('csv')}
-                        onExportXLS={() => handleExport('xls')}
-                        onExportPDF={() => handleExport('pdf')}
-                        onEmailExport={handleEmailExport}
-                        onExportGoogleSheets={() => handleExport('sheets')}
-                        loading={exportLoading}
-                        hasReport={!!report}
-                        hasCredentials={!!formData.connectedAccountId}
-                    />
+                {/* Export Section with Mode Toggle */}
+                {(viewMode === 'report' || viewMode === 'details') && (
+                    <Paper elevation={2.5} sx={{ p: 3, mb: 3 }}>
+                        {/* Header with Export Options title and Mode Toggle */}
+                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Typography variant="h6">
+                                Export Options
+                            </Typography>
+                            <ToggleButtonGroup
+                                value={viewMode}
+                                exclusive
+                                onChange={(event, newMode) => {
+                                    if (newMode !== null) {
+                                        if (newMode === 'report') {
+                                            handleSubmit();
+                                        } else if (newMode === 'details') {
+                                            handleViewDetails();
+                                        }
+                                    }
+                                }}
+                                aria-label="view mode"
+                                size="small"
+                            >
+                                <ToggleButton value="report" aria-label="generate report">
+                                    📊 Report
+                                </ToggleButton>
+                                <ToggleButton value="details" aria-label="view details">
+                                    🔍 Details
+                                </ToggleButton>
+                            </ToggleButtonGroup>
+                        </Box>
+
+                        {/* Export Buttons for report mode */}
+                        {viewMode === 'report' && (
+                            <ExportButtons
+                                onExportCSV={() => handleExport('csv')}
+                                onExportXLS={() => handleExport('xls')}
+                                onExportPDF={() => handleExport('pdf')}
+                                onEmailExport={handleEmailExport}
+                                onExportGoogleSheets={() => handleExport('sheets')}
+                                loading={exportLoading}
+                                hasReport={!!report}
+                                hasCredentials={!!formData.connectedAccountId}
+                                hideHeader={true}
+                            />
+                        )}
+
+                        {/* Export Buttons for detailed view mode */}
+                        {viewMode === 'details' && (
+                            <ExportButtons
+                                onExportCSV={() => handleDetailedExport('csv')}
+                                onExportXLS={() => handleDetailedExport('xls')}
+                                onExportPDF={() => handleDetailedExport('pdf')}
+                                onEmailExport={handleDetailedEmailExport}
+                                onExportGoogleSheets={() => handleDetailedExport('sheets')}
+                                loading={exportLoading}
+                                hasReport={showDetailedView}
+                                hasCredentials={!!formData.connectedAccountId}
+                                hideHeader={true}
+                            />
+                        )}
+                    </Paper>
                 )}
 
                 {/* Report Type Toggle - only show when report exists and in report mode */}
@@ -331,7 +443,7 @@ const Dashboard = ({ user, onLogout }) => {
                 <EmailExportModal
                     open={emailModalOpen}
                     onClose={() => setEmailModalOpen(false)}
-                    onExport={handleEmailExportSubmit}
+                    onExport={emailExportType === 'detailed' ? handleDetailedEmailExportSubmit : handleEmailExportSubmit}
                     loading={exportLoading}
                     reportInfo={{
                         startDate: formData.startDate,

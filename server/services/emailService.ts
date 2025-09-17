@@ -203,6 +203,86 @@ class EmailService {
             return false;
         }
     }
+
+    async sendDetailedTransactionsEmail(
+        toEmail: string,
+        startDate: string,
+        endDate: string,
+        timezone: string,
+        csvContent: string,
+        transactionCount: number
+    ): Promise<boolean> {
+        try {
+            // Create password-protected ZIP file containing the CSV
+            const zipBuffer = await this.createPasswordProtectedZip(
+                Buffer.from(csvContent, 'utf8'),
+                `stripe-detailed-transactions-${startDate}-${endDate}.csv`
+            );
+
+            // Create email content
+            const subject = `Stripe Detailed Transactions Report - ${startDate} to ${endDate}`;
+            const htmlContent = `
+                <html>
+                    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                            <h2 style="color: #635bff;">Stripe Detailed Transactions Report</h2>
+                            
+                            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                                <h3 style="margin-top: 0; color: #495057;">Report Details</h3>
+                                <p><strong>Date Range:</strong> ${startDate} to ${endDate}</p>
+                                <p><strong>Timezone:</strong> ${timezone}</p>
+                                <p><strong>Total Transactions:</strong> ${transactionCount}</p>
+                                <p><strong>Report Type:</strong> Detailed Transaction Data</p>
+                            </div>
+
+                            <div style="background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                                <h3 style="margin-top: 0; color: #1976d2;">Data Included</h3>
+                                <ul style="margin: 0;">
+                                    <li>Individual transaction records</li>
+                                    <li>Customer IP addresses</li>
+                                    <li>Decline reasons and failure codes</li>
+                                    <li>Risk levels and processor status</li>
+                                    <li>Fraud details and compliance data</li>
+                                    <li>Complete audit trail information</li>
+                                </ul>
+                            </div>
+
+                            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                                <h3 style="margin-top: 0; color: #856404;">Security Notice</h3>
+                                <p style="margin: 0;">This file is password-protected for security. Please contact your administrator for the password to extract the CSV file.</p>
+                            </div>
+
+                            <p style="margin-top: 30px; font-size: 14px; color: #6c757d;">
+                                This report was generated automatically by the Stripe Connect Reporting System.
+                            </p>
+                        </div>
+                    </body>
+                </html>
+            `;
+
+            // Send email with password-protected ZIP attachment
+            const mailOptions = {
+                from: process.env['SMTP_USER'],
+                to: toEmail,
+                subject: subject,
+                html: htmlContent,
+                attachments: [
+                    {
+                        filename: `stripe-detailed-transactions-${startDate}-${endDate}-PROTECTED.csv.zip`,
+                        content: zipBuffer,
+                        contentType: 'application/zip',
+                    },
+                ],
+                text: `Your Stripe Detailed Transactions report is attached as a password-protected ZIP file. Please contact your administrator for the password to extract the CSV file inside.`,
+            };
+
+            await this.getTransporter().sendMail(mailOptions);
+            return true;
+        } catch (error) {
+            console.error('Failed to send detailed transactions email:', error);
+            return false;
+        }
+    }
 }
 
 export default new EmailService();

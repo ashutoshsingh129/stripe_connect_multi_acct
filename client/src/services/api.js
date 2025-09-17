@@ -67,6 +67,13 @@ export const API_ENDPOINTS = {
     EXPORT_EMAIL: accountId => `/api/export/email/${accountId}`,
     EXPORT_GOOGLE_SHEETS: accountId => `/api/export/sheets/${accountId}`,
 
+    // Detailed transaction export endpoints
+    EXPORT_DETAILED_CSV: accountId => `/api/export/detailed/csv/${accountId}`,
+    EXPORT_DETAILED_XLS: accountId => `/api/export/detailed/xls/${accountId}`,
+    EXPORT_DETAILED_PDF: accountId => `/api/export/detailed/pdf/${accountId}`,
+    EXPORT_DETAILED_EMAIL: accountId => `/api/export/detailed/email/${accountId}`,
+    EXPORT_DETAILED_GOOGLE_SHEETS: accountId => `/api/export/detailed/sheets/${accountId}`,
+
     // Validation
     VALIDATE_KEYS: '/api/validate-keys',
 };
@@ -197,6 +204,51 @@ export const apiService = {
 
     exportToGoogleSheets: async (accountId, data, headers) => {
         const response = await api.post(API_ENDPOINTS.EXPORT_GOOGLE_SHEETS(accountId), data, {
+            headers,
+            timeout: 300000, // 5 minutes for export operations
+            responseType: 'blob', // Handle binary data
+        });
+        return response;
+    },
+
+    // Detailed transaction export functions
+    exportDetailedToCSV: async (accountId, data, headers) => {
+        const response = await api.post(API_ENDPOINTS.EXPORT_DETAILED_CSV(accountId), data, {
+            headers,
+            timeout: 300000, // 5 minutes for export operations
+            responseType: 'blob', // Handle binary data
+        });
+        return response;
+    },
+
+    exportDetailedToXLS: async (accountId, data, headers) => {
+        const response = await api.post(API_ENDPOINTS.EXPORT_DETAILED_XLS(accountId), data, {
+            headers,
+            timeout: 300000, // 5 minutes for export operations
+            responseType: 'blob', // Handle binary data
+        });
+        return response;
+    },
+
+    exportDetailedToPDF: async (accountId, data, headers) => {
+        const response = await api.post(API_ENDPOINTS.EXPORT_DETAILED_PDF(accountId), data, {
+            headers,
+            timeout: 300000, // 5 minutes for export operations
+            responseType: 'blob', // Handle binary data
+        });
+        return response;
+    },
+
+    exportDetailedToEmail: async (accountId, data, headers) => {
+        const response = await api.post(API_ENDPOINTS.EXPORT_DETAILED_EMAIL(accountId), data, {
+            headers,
+            timeout: 300000, // 5 minutes for export operations
+        });
+        return response.data;
+    },
+
+    exportDetailedToGoogleSheets: async (accountId, data, headers) => {
+        const response = await api.post(API_ENDPOINTS.EXPORT_DETAILED_GOOGLE_SHEETS(accountId), data, {
             headers,
             timeout: 300000, // 5 minutes for export operations
             responseType: 'blob', // Handle binary data

@@ -27,6 +27,7 @@ const ReportForm = ({
     onGenerateReport,
     onViewDetails,
     loading,
+    detailedViewLoading,
     timezones,
     accounts = [],
 }) => {
@@ -380,6 +381,7 @@ const ReportForm = ({
                                 onClick={onViewDetails}
                                 disabled={
                                     loading ||
+                                    detailedViewLoading ||
                                     selectedAccounts.length === 0 ||
                                     !formData.startDate ||
                                     !formData.endDate ||
@@ -389,7 +391,7 @@ const ReportForm = ({
                                 }
                                 sx={{ minWidth: 200, py: 1.5 }}
                             >
-                                View Details
+                                {detailedViewLoading ? 'Loading Details...' : 'View Details'}
                             </Button>
                         </Box>
                     </Box>

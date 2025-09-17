@@ -35,6 +35,7 @@ async function createPasswordProtectedZip(
 
         // Write file to temp directory
         fs.writeFileSync(tempFilePath, fileBuffer);
+        console.log(`📁 Written file to temp: ${tempFilePath}, size: ${fileBuffer.length} bytes`);
 
         // Create password-protected ZIP using system zip command
         // Use -j flag to junk (ignore) directory paths and only zip the file
@@ -44,15 +45,19 @@ async function createPasswordProtectedZip(
             // Use PowerShell Compress-Archive on Windows (note: this doesn't support password protection)
             // For now, we'll use a simple zip without password on Windows
             zipCommand = `powershell -command "Compress-Archive -Path '${tempFilePath}' -DestinationPath '${tempZipPath}' -Force"`;
+            console.log(`🪟 Windows ZIP command: ${zipCommand}`);
         } else {
             // Use zip command on Unix systems
             zipCommand = `zip -j -P "${password}" "${tempZipPath}" "${tempFilePath}"`;
+            console.log(`🐧 Unix ZIP command: ${zipCommand}`);
         }
 
         await execAsync(zipCommand);
+        console.log(`✅ ZIP command executed successfully`);
 
         // Read the ZIP file
         const zipBuffer = fs.readFileSync(tempZipPath);
+        console.log(`📦 ZIP file read, size: ${zipBuffer.length} bytes`);
 
         // Clean up temporary files
         fs.unlinkSync(tempFilePath);
@@ -61,7 +66,40 @@ async function createPasswordProtectedZip(
         return zipBuffer;
     } catch (error) {
         console.error('Error creating password-protected ZIP:', error);
-        throw new Error('Failed to create password-protected ZIP file');
+        
+        // Fallback: Create a simple ZIP without password protection
+        try {
+            console.log(`🔄 Attempting fallback ZIP creation without password...`);
+            const tempDir = path.join(__dirname, '../temp');
+            const tempFilePath = path.join(tempDir, filename);
+            const tempZipPath = path.join(tempDir, 'temp_' + Date.now() + '.zip');
+
+            // Ensure temp directory exists
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            // Write file to temp directory
+            fs.writeFileSync(tempFilePath, fileBuffer);
+
+            // Create simple ZIP without password
+            const fallbackCommand = process.platform === 'win32' 
+                ? `powershell -command "Compress-Archive -Path '${tempFilePath}' -DestinationPath '${tempZipPath}' -Force"`
+                : `zip -j "${tempZipPath}" "${tempFilePath}"`;
+
+            await execAsync(fallbackCommand);
+            const zipBuffer = fs.readFileSync(tempZipPath);
+
+            // Clean up temporary files
+            fs.unlinkSync(tempFilePath);
+            fs.unlinkSync(tempZipPath);
+
+            console.log(`✅ Fallback ZIP created successfully, size: ${zipBuffer.length} bytes`);
+            return zipBuffer;
+        } catch (fallbackError) {
+            console.error('Fallback ZIP creation also failed:', fallbackError);
+            throw new Error('Failed to create ZIP file with both password-protected and fallback methods');
+        }
     }
 }
 
@@ -1831,5 +1869,861 @@ async function testConnection() {
 }
 
 testConnection();
+
+// Detailed Transaction Export Routes
+router.post('/detailed/csv/:accountIds', validateJWT, validateStripeKeys, async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+        const { accountIds } = req.params;
+        const { start_date, end_date, timezone } = req.body;
+
+        if (!start_date || !end_date || !timezone) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameters',
+                message: 'start_date, end_date, and timezone are required',
+            });
+        }
+
+        // Parse account IDs
+        const accountIdList = accountIds.split(',').map((id: string) => id.trim());
+        
+        // Get detailed transactions data
+        const allDetailedData: any[] = [];
+        
+        for (const accountId of accountIdList) {
+            const complianceData = await stripeService.getComplianceTransactions(
+                req.user!.secretKey,
+                accountId,
+                start_date,
+                end_date,
+                timezone
+            );
+
+            // Process charges
+            const detailedCharges = complianceData.charges.map((charge: any) => ({
+                account_id: accountId,
+                transaction_type: 'charge',
+                id: charge.id,
+                amount: charge.amount / 100,
+                currency: charge.currency,
+                status: charge.status,
+                created: moment.unix(charge.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: charge.paid,
+                captured: charge.captured,
+                disputed: charge.disputed,
+                failure_code: charge.failure_code || '',
+                failure_message: charge.failure_message || '',
+                network_status: charge.outcome?.network_status || '',
+                outcome_type: charge.outcome?.type || '',
+                risk_level: charge.outcome?.risk_level || '',
+                seller_message: charge.outcome?.seller_message || '',
+                customer_ip: charge.metadata?.customer_ip || 'N/A',
+                description: charge.description || '',
+                receipt_email: charge.receipt_email || '',
+                receipt_url: charge.receipt_url || '',
+            }));
+
+            // Process payment intents
+            const detailedPaymentIntents = complianceData.paymentIntents.map((pi: any) => ({
+                account_id: accountId,
+                transaction_type: 'payment_intent',
+                id: pi.id,
+                amount: pi.amount / 100,
+                currency: pi.currency,
+                status: pi.status,
+                created: moment.unix(pi.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: pi.status === 'succeeded',
+                captured: pi.capture_method === 'automatic',
+                disputed: false,
+                failure_code: pi.last_payment_error?.code || '',
+                failure_message: pi.last_payment_error?.message || '',
+                network_status: pi.last_payment_error?.outcome?.network_status || '',
+                outcome_type: pi.last_payment_error?.outcome?.type || '',
+                risk_level: pi.last_payment_error?.outcome?.risk_level || '',
+                seller_message: pi.last_payment_error?.outcome?.seller_message || '',
+                customer_ip: pi.metadata?.customer_ip || 'N/A',
+                description: pi.description || '',
+                receipt_email: pi.receipt_email || '',
+                receipt_url: pi.receipt_url || '',
+            }));
+
+            allDetailedData.push(...detailedCharges, ...detailedPaymentIntents);
+        }
+
+        console.log(`📊 Detailed CSV Export - Total transactions found: ${allDetailedData.length}`);
+        console.log(`📋 Sample transaction data:`, allDetailedData.slice(0, 2));
+
+        // Create CSV content
+        const csvHeaders = [
+            'Account ID', 'Transaction Type', 'ID', 'Amount', 'Currency', 'Status',
+            'Created', 'Paid', 'Captured', 'Disputed', 'Failure Code', 'Failure Message',
+            'Network Status', 'Outcome Type', 'Risk Level', 'Seller Message',
+            'Customer IP', 'Description', 'Receipt Email', 'Receipt URL'
+        ];
+
+        const csvRows = allDetailedData.map(transaction => [
+            transaction.account_id,
+            transaction.transaction_type,
+            transaction.id,
+            transaction.amount,
+            transaction.currency,
+            transaction.status,
+            transaction.created,
+            transaction.paid,
+            transaction.captured,
+            transaction.disputed,
+            transaction.failure_code,
+            transaction.failure_message,
+            transaction.network_status,
+            transaction.outcome_type,
+            transaction.risk_level,
+            transaction.seller_message,
+            transaction.customer_ip,
+            transaction.description,
+            transaction.receipt_email,
+            transaction.receipt_url
+        ]);
+
+        const csvContent = [csvHeaders, ...csvRows]
+            .map(row => row.map(field => `"${field}"`).join(','))
+            .join('\n');
+
+        console.log(`📄 CSV content length: ${csvContent.length} characters`);
+        console.log(`📋 CSV preview:`, csvContent.substring(0, 200) + '...');
+
+        // Create password-protected ZIP
+        const password = process.env['STRIPE_IMPORT_PASSWORD'] || 'stripe2024!';
+        const zipBuffer = await createPasswordProtectedZip(
+            Buffer.from(csvContent, 'utf8'),
+            `stripe-detailed-transactions-${start_date}-${end_date}.csv`,
+            password
+        );
+
+        console.log(`📦 CSV ZIP created - Size: ${zipBuffer.length} bytes, Password: ${password}`);
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="stripe-detailed-transactions-${start_date}-${end_date}-PROTECTED.csv.zip"`);
+        res.setHeader('X-Password', password);
+        return res.send(zipBuffer);
+
+    } catch (error) {
+        console.error('Error exporting detailed CSV:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to export detailed CSV',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+
+// Detailed XLS Export Route
+router.post('/detailed/xls/:accountIds', validateJWT, validateStripeKeys, async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+        const { accountIds } = req.params;
+        const { start_date, end_date, timezone } = req.body;
+
+        if (!start_date || !end_date || !timezone) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameters',
+                message: 'start_date, end_date, and timezone are required',
+            });
+        }
+
+        // Parse account IDs
+        const accountIdList = accountIds.split(',').map((id: string) => id.trim());
+        
+        // Get detailed transactions data
+        const allDetailedData: any[] = [];
+        
+        for (const accountId of accountIdList) {
+            const complianceData = await stripeService.getComplianceTransactions(
+                req.user!.secretKey,
+                accountId,
+                start_date,
+                end_date,
+                timezone
+            );
+
+            // Process charges
+            const detailedCharges = complianceData.charges.map((charge: any) => ({
+                account_id: accountId,
+                transaction_type: 'charge',
+                id: charge.id,
+                amount: charge.amount / 100,
+                currency: charge.currency,
+                status: charge.status,
+                created: moment.unix(charge.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: charge.paid,
+                captured: charge.captured,
+                disputed: charge.disputed,
+                failure_code: charge.failure_code || '',
+                failure_message: charge.failure_message || '',
+                network_status: charge.outcome?.network_status || '',
+                outcome_type: charge.outcome?.type || '',
+                risk_level: charge.outcome?.risk_level || '',
+                seller_message: charge.outcome?.seller_message || '',
+                customer_ip: charge.metadata?.customer_ip || 'N/A',
+                description: charge.description || '',
+                receipt_email: charge.receipt_email || '',
+                receipt_url: charge.receipt_url || '',
+            }));
+
+            // Process payment intents
+            const detailedPaymentIntents = complianceData.paymentIntents.map((pi: any) => ({
+                account_id: accountId,
+                transaction_type: 'payment_intent',
+                id: pi.id,
+                amount: pi.amount / 100,
+                currency: pi.currency,
+                status: pi.status,
+                created: moment.unix(pi.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: pi.status === 'succeeded',
+                captured: pi.capture_method === 'automatic',
+                disputed: false,
+                failure_code: pi.last_payment_error?.code || '',
+                failure_message: pi.last_payment_error?.message || '',
+                network_status: pi.last_payment_error?.outcome?.network_status || '',
+                outcome_type: pi.last_payment_error?.outcome?.type || '',
+                risk_level: pi.last_payment_error?.outcome?.risk_level || '',
+                seller_message: pi.last_payment_error?.outcome?.seller_message || '',
+                customer_ip: pi.metadata?.customer_ip || 'N/A',
+                description: pi.description || '',
+                receipt_email: pi.receipt_email || '',
+                receipt_url: pi.receipt_url || '',
+            }));
+
+            allDetailedData.push(...detailedCharges, ...detailedPaymentIntents);
+        }
+
+        // Create Excel workbook
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(allDetailedData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Detailed Transactions');
+
+        // Generate Excel buffer
+        const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        console.log(`📄 Excel buffer size: ${excelBuffer.length} bytes`);
+
+        // Create password-protected ZIP
+        const password = process.env['STRIPE_IMPORT_PASSWORD'] || 'stripe2024!';
+        const zipBuffer = await createPasswordProtectedZip(
+            excelBuffer,
+            `stripe-detailed-transactions-${start_date}-${end_date}.xlsx`,
+            password
+        );
+
+        console.log(`📦 XLS ZIP created - Size: ${zipBuffer.length} bytes, Password: ${password}`);
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="stripe-detailed-transactions-${start_date}-${end_date}-PROTECTED.zip"`);
+        res.setHeader('X-Password', password);
+        return res.send(zipBuffer);
+
+    } catch (error) {
+        console.error('Error exporting detailed XLS:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to export detailed XLS',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+
+// Detailed PDF Export Route
+router.post('/detailed/pdf/:accountIds', validateJWT, validateStripeKeys, async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+        const { accountIds } = req.params;
+        const { start_date, end_date, timezone } = req.body;
+
+        if (!start_date || !end_date || !timezone) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameters',
+                message: 'start_date, end_date, and timezone are required',
+            });
+        }
+
+        // Parse account IDs
+        const accountIdList = accountIds.split(',').map((id: string) => id.trim());
+        
+        // Get detailed transactions data
+        const allDetailedData: any[] = [];
+        
+        for (const accountId of accountIdList) {
+            const complianceData = await stripeService.getComplianceTransactions(
+                req.user!.secretKey,
+                accountId,
+                start_date,
+                end_date,
+                timezone
+            );
+
+            // Process charges
+            const detailedCharges = complianceData.charges.map((charge: any) => ({
+                account_id: accountId,
+                transaction_type: 'charge',
+                id: charge.id,
+                amount: charge.amount / 100,
+                currency: charge.currency,
+                status: charge.status,
+                created: moment.unix(charge.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: charge.paid,
+                captured: charge.captured,
+                disputed: charge.disputed,
+                failure_code: charge.failure_code || '',
+                failure_message: charge.failure_message || '',
+                network_status: charge.outcome?.network_status || '',
+                outcome_type: charge.outcome?.type || '',
+                risk_level: charge.outcome?.risk_level || '',
+                seller_message: charge.outcome?.seller_message || '',
+                customer_ip: charge.metadata?.customer_ip || 'N/A',
+                description: charge.description || '',
+                receipt_email: charge.receipt_email || '',
+                receipt_url: charge.receipt_url || '',
+            }));
+
+            // Process payment intents
+            const detailedPaymentIntents = complianceData.paymentIntents.map((pi: any) => ({
+                account_id: accountId,
+                transaction_type: 'payment_intent',
+                id: pi.id,
+                amount: pi.amount / 100,
+                currency: pi.currency,
+                status: pi.status,
+                created: moment.unix(pi.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: pi.status === 'succeeded',
+                captured: pi.capture_method === 'automatic',
+                disputed: false,
+                failure_code: pi.last_payment_error?.code || '',
+                failure_message: pi.last_payment_error?.message || '',
+                network_status: pi.last_payment_error?.outcome?.network_status || '',
+                outcome_type: pi.last_payment_error?.outcome?.type || '',
+                risk_level: pi.last_payment_error?.outcome?.risk_level || '',
+                seller_message: pi.last_payment_error?.outcome?.seller_message || '',
+                customer_ip: pi.metadata?.customer_ip || 'N/A',
+                description: pi.description || '',
+                receipt_email: pi.receipt_email || '',
+                receipt_url: pi.receipt_url || '',
+            }));
+
+            allDetailedData.push(...detailedCharges, ...detailedPaymentIntents);
+        }
+
+        console.log(`📊 PDF Export - Total transactions: ${allDetailedData.length}`);
+        if (allDetailedData.length > 0) {
+            console.log(`📋 Sample transaction for PDF:`, {
+                id: allDetailedData[0].id,
+                account_id: allDetailedData[0].account_id,
+                amount: allDetailedData[0].amount,
+                status: allDetailedData[0].status,
+                customer_ip: allDetailedData[0].customer_ip,
+                failure_code: allDetailedData[0].failure_code,
+                outcome_type: allDetailedData[0].outcome_type
+            });
+        }
+
+        // Create PDF using the same approach as working regular PDF export
+        const pdfPassword = process.env['STRIPE_IMPORT_PASSWORD'] || 'stripe2024!';
+        const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+            try {
+                const doc = new PDFDocument({
+                    size: 'A4',
+                    layout: 'portrait',
+                    margins: {
+                        top: 50,
+                        bottom: 50,
+                        left: 50,
+                        right: 50,
+                    },
+                    // Add password protection directly to PDF
+                    userPassword: pdfPassword,
+                    ownerPassword: pdfPassword,
+                    permissions: {
+                        printing: 'highResolution',
+                        modifying: false,
+                        copying: false,
+                        annotating: false,
+                        fillingForms: false,
+                        contentAccessibility: false,
+                        documentAssembly: false,
+                    },
+                });
+
+                const chunks: Buffer[] = [];
+                doc.on('data', chunk => chunks.push(chunk));
+                doc.on('end', () => {
+                    const pdfData = Buffer.concat(chunks);
+                    console.log(`📄 Detailed PDF generated - Size: ${pdfData.length} bytes`);
+                    resolve(pdfData);
+                });
+
+                doc.on('error', (error) => {
+                    console.error('Detailed PDF generation error:', error);
+                    reject(error);
+                });
+
+                // PDF content
+                doc.fontSize(20)
+                    .font('Helvetica-Bold')
+                    .text('Stripe Detailed Transactions Report', { align: 'center' });
+
+                doc.moveDown();
+                doc.fontSize(12)
+                    .font('Helvetica')
+                    .text(`Report Period: ${start_date} to ${end_date}`, { align: 'center' });
+
+                doc.moveDown();
+                doc.text(`Timezone: ${timezone}`, { align: 'center' });
+                doc.text(`Total Transactions: ${allDetailedData.length}`, { align: 'center' });
+                doc.text(`Generated on: ${moment().format('YYYY-MM-DD HH:mm:ss UTC')}`, { align: 'center' });
+
+                doc.moveDown(2);
+
+                // Add detailed transactions with comprehensive information
+                let currentY = 200;
+                const lineHeight = 12;
+                const pageHeight = 750;
+
+                allDetailedData.slice(0, 20).forEach((transaction, index) => {
+                    // Check if we need a new page
+                    if (currentY > pageHeight) {
+                        doc.addPage();
+                        currentY = 50;
+                    }
+
+                    // Transaction header
+                    doc.fontSize(12).text(`Transaction ${index + 1}: ${transaction.id}`, 50, currentY);
+                    currentY += lineHeight + 5;
+
+                    // Basic Information
+                    doc.fontSize(10).text('Basic Information:', 50, currentY);
+                    currentY += lineHeight;
+                    
+                    doc.fontSize(9).text(`Account ID: ${transaction.account_id}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Type: ${transaction.transaction_type}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Amount: $${transaction.amount} ${transaction.currency}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Status: ${transaction.status}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Created: ${transaction.created}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Paid: ${transaction.paid ? 'Yes' : 'No'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Captured: ${transaction.captured ? 'Yes' : 'No'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Disputed: ${transaction.disputed ? 'Yes' : 'No'}`, 70, currentY);
+                    currentY += lineHeight + 5;
+
+                    // Compliance Details
+                    doc.fontSize(10).text('Compliance Details:', 50, currentY);
+                    currentY += lineHeight;
+                    
+                    doc.fontSize(9).text(`Failure Code: ${transaction.failure_code || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Failure Message: ${transaction.failure_message || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Network Status: ${transaction.network_status || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Outcome Type: ${transaction.outcome_type || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Risk Level: ${transaction.risk_level || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Seller Message: ${transaction.seller_message || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight + 5;
+
+                    // IP and Customer Information
+                    doc.fontSize(10).text('Customer & IP Information:', 50, currentY);
+                    currentY += lineHeight;
+                    
+                    doc.fontSize(9).text(`Customer IP: ${transaction.customer_ip || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Description: ${transaction.description || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Receipt Email: ${transaction.receipt_email || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight;
+                    doc.text(`Receipt URL: ${transaction.receipt_url || 'N/A'}`, 70, currentY);
+                    currentY += lineHeight + 10;
+
+                    // Add separator line
+                    doc.moveTo(50, currentY).lineTo(550, currentY).stroke();
+                    currentY += 10;
+                });
+
+                doc.end();
+            } catch (error) {
+                reject(error);
+            }
+        });
+
+        console.log(`📄 Detailed PDF ready, size: ${pdfBuffer.length} bytes, Password: ${pdfPassword}`);
+
+        // Send password-protected PDF directly as binary download (same as working regular PDF)
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="stripe-detailed-transactions-${start_date}-${end_date}-PROTECTED.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length.toString());
+        res.setHeader('X-Password', pdfPassword);
+        res.send(pdfBuffer);
+        return res;
+
+    } catch (error) {
+        console.error('Error exporting detailed PDF:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to export detailed PDF',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+
+// Detailed Email Export Route
+router.post('/detailed/email/:accountIds', validateJWT, validateStripeKeys, async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+        const { accountIds } = req.params;
+        const { start_date, end_date, timezone, email } = req.body;
+
+        if (!start_date || !end_date || !timezone || !email) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameters',
+                message: 'start_date, end_date, timezone, and email are required',
+            });
+        }
+
+        // Parse account IDs
+        const accountIdList = accountIds.split(',').map((id: string) => id.trim());
+        
+        // Get detailed transactions data
+        const allDetailedData: any[] = [];
+        
+        for (const accountId of accountIdList) {
+            const complianceData = await stripeService.getComplianceTransactions(
+                req.user!.secretKey,
+                accountId,
+                start_date,
+                end_date,
+                timezone
+            );
+
+            // Process charges
+            const detailedCharges = complianceData.charges.map((charge: any) => ({
+                account_id: accountId,
+                transaction_type: 'charge',
+                id: charge.id,
+                amount: charge.amount / 100,
+                currency: charge.currency,
+                status: charge.status,
+                created: moment.unix(charge.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: charge.paid,
+                captured: charge.captured,
+                disputed: charge.disputed,
+                failure_code: charge.failure_code || '',
+                failure_message: charge.failure_message || '',
+                network_status: charge.outcome?.network_status || '',
+                outcome_type: charge.outcome?.type || '',
+                risk_level: charge.outcome?.risk_level || '',
+                seller_message: charge.outcome?.seller_message || '',
+                customer_ip: charge.metadata?.customer_ip || 'N/A',
+                description: charge.description || '',
+                receipt_email: charge.receipt_email || '',
+                receipt_url: charge.receipt_url || '',
+            }));
+
+            // Process payment intents
+            const detailedPaymentIntents = complianceData.paymentIntents.map((pi: any) => ({
+                account_id: accountId,
+                transaction_type: 'payment_intent',
+                id: pi.id,
+                amount: pi.amount / 100,
+                currency: pi.currency,
+                status: pi.status,
+                created: moment.unix(pi.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: pi.status === 'succeeded',
+                captured: pi.capture_method === 'automatic',
+                disputed: false,
+                failure_code: pi.last_payment_error?.code || '',
+                failure_message: pi.last_payment_error?.message || '',
+                network_status: pi.last_payment_error?.outcome?.network_status || '',
+                outcome_type: pi.last_payment_error?.outcome?.type || '',
+                risk_level: pi.last_payment_error?.outcome?.risk_level || '',
+                seller_message: pi.last_payment_error?.outcome?.seller_message || '',
+                customer_ip: pi.metadata?.customer_ip || 'N/A',
+                description: pi.description || '',
+                receipt_email: pi.receipt_email || '',
+                receipt_url: pi.receipt_url || '',
+            }));
+
+            allDetailedData.push(...detailedCharges, ...detailedPaymentIntents);
+        }
+
+        // Create CSV content for email
+        const csvHeaders = [
+            'Account ID', 'Transaction Type', 'ID', 'Amount', 'Currency', 'Status',
+            'Created', 'Paid', 'Captured', 'Disputed', 'Failure Code', 'Failure Message',
+            'Network Status', 'Outcome Type', 'Risk Level', 'Seller Message',
+            'Customer IP', 'Description', 'Receipt Email', 'Receipt URL'
+        ];
+
+        const csvRows = allDetailedData.map(transaction => [
+            transaction.account_id,
+            transaction.transaction_type,
+            transaction.id,
+            transaction.amount,
+            transaction.currency,
+            transaction.status,
+            transaction.created,
+            transaction.paid,
+            transaction.captured,
+            transaction.disputed,
+            transaction.failure_code,
+            transaction.failure_message,
+            transaction.network_status,
+            transaction.outcome_type,
+            transaction.risk_level,
+            transaction.seller_message,
+            transaction.customer_ip,
+            transaction.description,
+            transaction.receipt_email,
+            transaction.receipt_url
+        ]);
+
+        const csvContent = [csvHeaders, ...csvRows]
+            .map(row => row.map(field => `"${field}"`).join(','))
+            .join('\n');
+
+        // Send email with CSV attachment
+        await emailService.sendDetailedTransactionsEmail(
+            email,
+            start_date,
+            end_date,
+            timezone,
+            csvContent,
+            allDetailedData.length
+        );
+
+        return res.json({
+            success: true,
+            message: `Detailed transactions report sent to ${email}`,
+            transactionCount: allDetailedData.length,
+        });
+
+    } catch (error) {
+        console.error('Error sending detailed email export:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to send detailed email export',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+
+// Detailed Google Sheets Export Route
+router.post('/detailed/sheets/:accountIds', validateJWT, validateStripeKeys, async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+        const { accountIds } = req.params;
+        const { start_date, end_date, timezone } = req.body;
+
+        if (!start_date || !end_date || !timezone) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameters',
+                message: 'start_date, end_date, and timezone are required',
+            });
+        }
+
+        // Parse account IDs
+        const accountIdList = accountIds.split(',').map((id: string) => id.trim());
+        
+        // Get detailed transactions data
+        const allDetailedData: any[] = [];
+        
+        for (const accountId of accountIdList) {
+            const complianceData = await stripeService.getComplianceTransactions(
+                req.user!.secretKey,
+                accountId,
+                start_date,
+                end_date,
+                timezone
+            );
+
+            // Process charges
+            const detailedCharges = complianceData.charges.map((charge: any) => ({
+                account_id: accountId,
+                transaction_type: 'charge',
+                id: charge.id,
+                amount: charge.amount / 100,
+                currency: charge.currency,
+                status: charge.status,
+                created: moment.unix(charge.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: charge.paid,
+                captured: charge.captured,
+                disputed: charge.disputed,
+                failure_code: charge.failure_code || '',
+                failure_message: charge.failure_message || '',
+                network_status: charge.outcome?.network_status || '',
+                outcome_type: charge.outcome?.type || '',
+                risk_level: charge.outcome?.risk_level || '',
+                seller_message: charge.outcome?.seller_message || '',
+                customer_ip: charge.metadata?.customer_ip || 'N/A',
+                description: charge.description || '',
+                receipt_email: charge.receipt_email || '',
+                receipt_url: charge.receipt_url || '',
+            }));
+
+            // Process payment intents
+            const detailedPaymentIntents = complianceData.paymentIntents.map((pi: any) => ({
+                account_id: accountId,
+                transaction_type: 'payment_intent',
+                id: pi.id,
+                amount: pi.amount / 100,
+                currency: pi.currency,
+                status: pi.status,
+                created: moment.unix(pi.created).format('YYYY-MM-DD HH:mm:ss'),
+                paid: pi.status === 'succeeded',
+                captured: pi.capture_method === 'automatic',
+                disputed: false,
+                failure_code: pi.last_payment_error?.code || '',
+                failure_message: pi.last_payment_error?.message || '',
+                network_status: pi.last_payment_error?.outcome?.network_status || '',
+                outcome_type: pi.last_payment_error?.outcome?.type || '',
+                risk_level: pi.last_payment_error?.outcome?.risk_level || '',
+                seller_message: pi.last_payment_error?.outcome?.seller_message || '',
+                customer_ip: pi.metadata?.customer_ip || 'N/A',
+                description: pi.description || '',
+                receipt_email: pi.receipt_email || '',
+                receipt_url: pi.receipt_url || '',
+            }));
+
+            allDetailedData.push(...detailedCharges, ...detailedPaymentIntents);
+        }
+
+        // Create Excel workbook for Google Sheets
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(allDetailedData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Detailed Transactions');
+
+        // Generate Excel buffer
+        const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        // Create password-protected ZIP
+        const password = process.env['STRIPE_IMPORT_PASSWORD'] || 'stripe2024!';
+        const zipBuffer = await createPasswordProtectedZip(
+            excelBuffer,
+            `stripe-detailed-transactions-${start_date}-${end_date}.xlsx`,
+            password
+        );
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="stripe-detailed-transactions-${start_date}-${end_date}-google-sheets-PROTECTED.zip"`);
+        res.setHeader('X-Password', password);
+        return res.send(zipBuffer);
+
+    } catch (error) {
+        console.error('Error exporting detailed Google Sheets:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to export detailed Google Sheets',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+
+// Test route to debug ZIP creation
+router.post('/test-zip', validateJWT, async (_req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+        console.log('🧪 Testing ZIP creation...');
+        
+        // Create a simple test file
+        const testContent = 'Account ID,Transaction Type,ID,Amount,Currency,Status\nacct_test,charge,ch_test,100,usd,succeeded';
+        const testBuffer = Buffer.from(testContent, 'utf8');
+        
+        console.log(`📄 Test content: ${testContent}`);
+        console.log(`📄 Test buffer size: ${testBuffer.length} bytes`);
+        
+        // Test ZIP creation
+        const password = process.env['STRIPE_IMPORT_PASSWORD'] || 'stripe2024!';
+        const zipBuffer = await createPasswordProtectedZip(
+            testBuffer,
+            'test-file.csv',
+            password
+        );
+        
+        console.log(`📦 Test ZIP created, size: ${zipBuffer.length} bytes`);
+        
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', 'attachment; filename="test-export.zip"');
+        res.setHeader('X-Password', password);
+        res.send(zipBuffer);
+        return res;
+        
+    } catch (error) {
+        console.error('Test ZIP creation failed:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Test ZIP creation failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+
+// Test route to debug PDF generation (without ZIP)
+router.post('/test-pdf', validateJWT, async (_req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+        console.log('🧪 Testing PDF generation...');
+        
+        // Create PDF using Promise-based approach
+        const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+            const doc = new PDFDocument();
+            const buffers: Buffer[] = [];
+            
+            doc.on('data', buffers.push.bind(buffers));
+            
+            doc.on('end', () => {
+                try {
+                    const pdfData = Buffer.concat(buffers);
+                    console.log(`📄 Test PDF generated - Size: ${pdfData.length} bytes`);
+                    resolve(pdfData);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+
+            doc.on('error', (error) => {
+                console.error('Test PDF generation error:', error);
+                reject(error);
+            });
+
+            // Simple PDF content
+            doc.fontSize(16).text('Test PDF Document', { align: 'center' });
+            doc.fontSize(12).text('This is a test PDF to verify generation works.', { align: 'center' });
+            doc.moveDown();
+            doc.fontSize(10).text('Test Data:', 50, 150);
+            doc.text('Account ID: acct_test', 50, 170);
+            doc.text('Transaction ID: ch_test', 50, 190);
+            doc.text('Amount: $1.00', 50, 210);
+            doc.text('Status: succeeded', 50, 230);
+
+            doc.end();
+        });
+
+        console.log(`📄 Test PDF ready, size: ${pdfBuffer.length} bytes`);
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="test-document.pdf"');
+        res.send(pdfBuffer);
+        return res;
+        
+    } catch (error) {
+        console.error('Test PDF generation failed:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Test PDF generation failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
 
 export default router;

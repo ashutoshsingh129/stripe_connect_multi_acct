@@ -199,6 +199,8 @@ router.get(
     async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
         try {
             const { accountIds } = req.params;
+            console.log(`Server received accountIds: "${accountIds}"`);
+            
             const {
                 start_date,
                 end_date,
@@ -272,11 +274,15 @@ router.get(
             const pageNum = parseInt(page as string, 10);
             const limitNum = parseInt(limit as string, 10);
 
+            console.log(`Processing ${accountIdList.length} accounts:`, accountIdList);
+            console.log(`📅 Date range: ${startDate} to ${endDate} (timezone: ${timezone})`);
+
             // Get detailed compliance data for all accounts
             const allDetailedData: any[] = [];
 
             for (const accountId of accountIdList) {
                 try {
+                    console.log(`Processing account: ${accountId}`);
                     const complianceData = await stripeService.getComplianceTransactions(
                         req.user!.secretKey,
                         accountId,
@@ -284,6 +290,7 @@ router.get(
                         endDate,
                         timezone as string
                     );
+                    console.log(`Account ${accountId} - Charges: ${complianceData.charges.length}, PaymentIntents: ${complianceData.paymentIntents.length}`);
 
                     // Flatten charges data with compliance fields
                     const detailedCharges = complianceData.charges.map((charge: any) => ({
@@ -366,6 +373,7 @@ router.get(
                     }));
 
                     allDetailedData.push(...detailedCharges, ...detailedPaymentIntents);
+                    console.log(`Added ${detailedCharges.length + detailedPaymentIntents.length} transactions from account ${accountId}. Total so far: ${allDetailedData.length}`);
                 } catch (error) {
                     console.error(`Error processing account ${accountId}:`, error);
                     // Continue with other accounts
@@ -379,6 +387,9 @@ router.get(
             const startIndex = (pageNum - 1) * limitNum;
             const endIndex = startIndex + limitNum;
             const paginatedData = allDetailedData.slice(startIndex, endIndex);
+
+            // Debug logging
+            console.log(`Detailed Transactions - Total: ${allDetailedData.length}, Page: ${pageNum}, Limit: ${limitNum}, Showing: ${paginatedData.length} items`);
 
             const response = {
                 success: true,

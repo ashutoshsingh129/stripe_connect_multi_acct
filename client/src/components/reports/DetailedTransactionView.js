@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Paper,
     Typography,
@@ -19,7 +19,6 @@ import {
     Chip,
     Collapse,
     Button,
-    TextField,
     Grid,
     Card,
     CardContent,
@@ -36,7 +35,7 @@ import {
     CheckCircle as CheckCircleIcon,
     Cancel as CancelIcon,
 } from '@mui/icons-material';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 import { apiService } from '../../services/api';
 import { encryptSecretKey, encryptPublicKey } from '../../utils/encryption';
 
@@ -45,7 +44,7 @@ const DetailedTransactionView = ({
     startDate, 
     endDate, 
     timezone,
-    onClose 
+    onClose
 }) => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -64,7 +63,7 @@ const DetailedTransactionView = ({
     const [filterRiskLevel, setFilterRiskLevel] = useState('all');
 
     // Fetch detailed transactions
-    const fetchDetailedTransactions = async (page = 1, limit = 50) => {
+    const fetchDetailedTransactions = useCallback(async (page = 1, limit = 50) => {
         try {
             console.log(`Fetching detailed transactions for accountIds: "${accountIds}"`);
             
@@ -113,13 +112,13 @@ const DetailedTransactionView = ({
             setLoading(false);
             setPaginationLoading(false);
         }
-    };
+    }, [accountIds, startDate, endDate, timezone]);
 
     useEffect(() => {
-        if (accountIds && startDate && endDate) {
+        if (accountIds && startDate && endDate && timezone) {
             fetchDetailedTransactions();
         }
-    }, [accountIds, startDate, endDate, timezone]);
+    }, [accountIds, startDate, endDate, timezone, fetchDetailedTransactions]);
 
     const handlePageChange = (newPage) => {
         fetchDetailedTransactions(newPage, pagination.itemsPerPage);
@@ -226,6 +225,7 @@ const DetailedTransactionView = ({
             <Typography variant="body2" color="textSecondary" gutterBottom sx={{ mb: 2 }}>
                 Date Range: {startDate} to {endDate} ({timezone})
             </Typography>
+
 
             {/* Filters */}
             <Grid container spacing={2} sx={{ mb: 2 }}>
