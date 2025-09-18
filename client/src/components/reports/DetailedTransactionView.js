@@ -261,20 +261,45 @@ const DetailedTransactionView = ({
             </Grid>
 
             <Box sx={{ position: 'relative' }}>
-                <TableContainer>
-                    <Table>
+                <TableContainer sx={{ 
+                    maxWidth: '100%', 
+                    overflowX: 'auto',
+                    '&::-webkit-scrollbar': {
+                        height: '8px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                        backgroundColor: '#f1f1f1',
+                        borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                        backgroundColor: '#c1c1c1',
+                        borderRadius: '4px',
+                        '&:hover': {
+                            backgroundColor: '#a8a8a8',
+                        },
+                    },
+                }}>
+                    <Table sx={{ 
+                        minWidth: 1200,
+                        '& .MuiTableCell-root': {
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '200px',
+                        }
+                    }}>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Expand</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>ID</TableCell>
-                                <TableCell align="right">Amount</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Risk Level</TableCell>
-                                <TableCell>Network Status</TableCell>
-                                        <TableCell>Created</TableCell>
-                                        <TableCell>Customer IP</TableCell>
-                                        <TableCell>Account</TableCell>
+                                <TableCell sx={{ width: '60px' }}>Expand</TableCell>
+                                <TableCell sx={{ width: '100px' }}>Type</TableCell>
+                                <TableCell sx={{ width: '200px' }}>ID</TableCell>
+                                <TableCell sx={{ width: '100px' }} align="right">Amount</TableCell>
+                                <TableCell sx={{ width: '120px' }}>Status</TableCell>
+                                <TableCell sx={{ width: '120px' }}>Risk Level</TableCell>
+                                <TableCell sx={{ width: '120px' }}>Network Status</TableCell>
+                                <TableCell sx={{ width: '150px' }}>Created</TableCell>
+                                <TableCell sx={{ width: '120px' }}>Customer IP</TableCell>
+                                <TableCell sx={{ width: '200px' }}>Account</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -301,9 +326,20 @@ const DetailedTransactionView = ({
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="caption" fontFamily="monospace">
-                                                {transaction.id}
-                                            </Typography>
+                                            <Tooltip title={transaction.id} placement="top">
+                                                <Typography 
+                                                    variant="caption" 
+                                                    fontFamily="monospace"
+                                                    sx={{ 
+                                                        wordBreak: 'break-all',
+                                                        fontSize: '0.75rem',
+                                                        lineHeight: 1.2,
+                                                        cursor: 'help'
+                                                    }}
+                                                >
+                                                    {transaction.id}
+                                                </Typography>
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell align="right">
                                             {formatCurrency(transaction.amount)}
@@ -321,14 +357,36 @@ const DetailedTransactionView = ({
                                             {transaction.created}
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="caption" fontFamily="monospace">
-                                                {transaction.customer_ip || 'N/A'}
-                                            </Typography>
+                                            <Tooltip title={transaction.customer_ip || 'N/A'} placement="top">
+                                                <Typography 
+                                                    variant="caption" 
+                                                    fontFamily="monospace"
+                                                    sx={{ 
+                                                        wordBreak: 'break-all',
+                                                        fontSize: '0.75rem',
+                                                        lineHeight: 1.2,
+                                                        cursor: 'help'
+                                                    }}
+                                                >
+                                                    {transaction.customer_ip || 'N/A'}
+                                                </Typography>
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="caption" fontFamily="monospace">
-                                                {transaction.account_id}
-                                            </Typography>
+                                            <Tooltip title={transaction.account_id} placement="top">
+                                                <Typography 
+                                                    variant="caption" 
+                                                    fontFamily="monospace"
+                                                    sx={{ 
+                                                        wordBreak: 'break-all',
+                                                        fontSize: '0.75rem',
+                                                        lineHeight: 1.2,
+                                                        cursor: 'help'
+                                                    }}
+                                                >
+                                                    {transaction.account_id}
+                                                </Typography>
+                                            </Tooltip>
                                         </TableCell>
                                     </TableRow>
                                     

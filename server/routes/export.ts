@@ -177,18 +177,18 @@ async function createPdfReport(
                 'Total Count',
                 'Total Amount',
             ];
-            const pageWidth = doc.page.width - 100; // Leave 50px margin on each side
+            const pageWidth = doc.page.width - 40; // Reduced margins to 20px each side for more space
             const columnWidths = [
-                pageWidth * 0.12, // Date: 12%
-                pageWidth * 0.2, // Account ID: 20%
-                pageWidth * 0.12, // Charges Count: 12%
-                pageWidth * 0.14, // Charges Amount: 14%
-                pageWidth * 0.12, // Refunds Count: 12%
-                pageWidth * 0.14, // Refunds Amount: 14%
-                pageWidth * 0.08, // Total Count: 8%
-                pageWidth * 0.08, // Total Amount: 8%
+                pageWidth * 0.08, // Date: 8% (reduced from 10%)
+                pageWidth * 0.20, // Account ID: 20% (reduced from 25%)
+                pageWidth * 0.08, // Charges Count: 8% (reduced from 10%)
+                pageWidth * 0.10, // Charges Amount: 10% (reduced from 12%)
+                pageWidth * 0.08, // Refunds Count: 8% (reduced from 10%)
+                pageWidth * 0.10, // Refunds Amount: 10% (reduced from 12%)
+                pageWidth * 0.06, // Total Count: 6% (reduced from 8%)
+                pageWidth * 0.06, // Total Amount: 6% (reduced from 8%)
             ];
-            const startX = 50;
+            const startX = 20; // Reduced from 50 to match new margin
             let currentY = doc.y;
 
             const headerRowHeight = 30; // fixed height to avoid overlap
@@ -262,14 +262,24 @@ async function createPdfReport(
                     doc.fillColor('black');
                 }
 
+                let maxRowHeight = 20; // Default row height
                 rowData.forEach((cell, index) => {
                     const x =
                         startX +
                         columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0);
-                    doc.text(cell, x + 5, currentY + 5, { width: columnWidths[index] - 10 });
+                    const textHeight = doc.heightOfString(cell, {
+                        width: columnWidths[index] - 10,
+                        align: 'left'
+                    });
+                    maxRowHeight = Math.max(maxRowHeight, textHeight + 10);
+                    
+                    doc.text(cell, x + 5, currentY + 5, { 
+                        width: columnWidths[index] - 10,
+                        align: 'left'
+                    });
                 });
 
-                currentY += 20;
+                currentY += maxRowHeight;
             });
 
             // Add footer with page count
@@ -2230,7 +2240,7 @@ router.post('/detailed/pdf/:accountIds', validateJWT, validateStripeKeys, async 
             try {
                 const doc = new PDFDocument({
                     size: 'A4',
-                    layout: 'portrait',
+                    layout: 'landscape',
                     margins: {
                         top: 50,
                         bottom: 50,
@@ -2281,76 +2291,134 @@ router.post('/detailed/pdf/:accountIds', validateJWT, validateStripeKeys, async 
 
                 doc.moveDown(2);
 
-                // Add detailed transactions with comprehensive information
-                let currentY = 200;
-                const lineHeight = 12;
-                const pageHeight = 750;
+                // Add detailed transactions table (similar to regular report format)
+                doc.fontSize(14).font('Helvetica-Bold').text('Detailed Transaction Details');
 
-                allDetailedData.slice(0, 20).forEach((transaction, index) => {
-                    // Check if we need a new page
-                    if (currentY > pageHeight) {
+                doc.moveDown();
+
+                // Table headers for detailed transactions
+                const headers = [
+                    'Account ID',
+                    'Type',
+                    'Transaction ID',
+                    'Amount',
+                    'Currency',
+                    'Status',
+                    'Created',
+                    'Customer IP',
+                    'Failure Code',
+                    'Outcome Type',
+                    'Risk Level'
+                ];
+                const pageWidth = doc.page.width - 40; // Reduced margins to 20px each side for more space
+                const columnWidths = [
+                    pageWidth * 0.12, // Account ID: 12% (reduced from 15%)
+                    pageWidth * 0.05, // Type: 5% (reduced from 6%)
+                    pageWidth * 0.15, // Transaction ID: 15% (reduced from 18%)
+                    pageWidth * 0.07, // Amount: 7% (reduced from 8%)
+                    pageWidth * 0.05, // Currency: 5% (reduced from 6%)
+                    pageWidth * 0.07, // Status: 7% (reduced from 8%)
+                    pageWidth * 0.08, // Created: 8% (reduced from 10%)
+                    pageWidth * 0.10, // Customer IP: 10% (reduced from 12%)
+                    pageWidth * 0.07, // Failure Code: 7% (reduced from 8%)
+                    pageWidth * 0.07, // Outcome Type: 7% (reduced from 8%)
+                    pageWidth * 0.05, // Risk Level: 5% (reduced from 6%)
+                ];
+                const startX = 20; // Reduced from 50 to match new margin
+                let currentY = doc.y;
+
+                const headerRowHeight = 30; // fixed height to avoid overlap
+
+                doc.fontSize(8).font('Helvetica-Bold').fillColor('black');
+
+                // Draw headers
+                headers.forEach((header, index) => {
+                    const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0);
+                    doc.text(header, x + 2, currentY + 5, {
+                        width: columnWidths[index] - 4,
+                    });
+                });
+
+                // Draw horizontal line just below header
+                doc.moveTo(startX, currentY + headerRowHeight)
+                    .lineTo(
+                        startX + columnWidths.reduce((sum, w) => sum + w, 0),
+                        currentY + headerRowHeight
+                    )
+                    .stroke();
+
+                // Move Y position for table rows
+                currentY += headerRowHeight + 5;
+
+                // Draw data rows with proper pagination
+                doc.fontSize(8).font('Helvetica').fillColor('black');
+
+                allDetailedData.slice(0, 100).forEach((transaction) => {
+                    // Check if we need a new page (leave 50px margin at bottom)
+                    if (currentY > doc.page.height - 100) {
                         doc.addPage();
                         currentY = 50;
+
+                        // Redraw header on new page
+                        doc.fontSize(8).font('Helvetica-Bold').fillColor('black');
+                        headers.forEach((header, index) => {
+                            const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0);
+                            doc.text(header, x + 2, currentY + 5, {
+                                width: columnWidths[index] - 4,
+                            });
+                        });
+                        
+                        // Draw header line
+                        doc.moveTo(startX, currentY + headerRowHeight)
+                            .lineTo(
+                                startX + columnWidths.reduce((sum, w) => sum + w, 0),
+                                currentY + headerRowHeight
+                            )
+                            .stroke();
+                        
+                        currentY += headerRowHeight + 5;
+                        doc.fontSize(7).font('Helvetica').fillColor('black');
                     }
 
-                    // Transaction header
-                    doc.fontSize(12).text(`Transaction ${index + 1}: ${transaction.id}`, 50, currentY);
-                    currentY += lineHeight + 5;
+                    const rowData = [
+                        transaction.account_id,
+                        transaction.transaction_type,
+                        transaction.id,
+                        `$${transaction.amount}`,
+                        transaction.currency.toUpperCase(),
+                        transaction.status,
+                        transaction.created,
+                        transaction.customer_ip || 'N/A',
+                        transaction.failure_code || 'N/A',
+                        transaction.outcome_type || 'N/A',
+                        transaction.risk_level || 'N/A'
+                    ];
 
-                    // Basic Information
-                    doc.fontSize(10).text('Basic Information:', 50, currentY);
-                    currentY += lineHeight;
-                    
-                    doc.fontSize(9).text(`Account ID: ${transaction.account_id}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Type: ${transaction.transaction_type}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Amount: $${transaction.amount} ${transaction.currency}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Status: ${transaction.status}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Created: ${transaction.created}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Paid: ${transaction.paid ? 'Yes' : 'No'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Captured: ${transaction.captured ? 'Yes' : 'No'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Disputed: ${transaction.disputed ? 'Yes' : 'No'}`, 70, currentY);
-                    currentY += lineHeight + 5;
+                    // Draw row data with better text handling
+                    let maxRowHeight = 20; // Default row height
+                    rowData.forEach((data, index) => {
+                        const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0);
+                        const textHeight = doc.heightOfString(data.toString(), {
+                            width: columnWidths[index] - 2,
+                            align: 'left'
+                        });
+                        maxRowHeight = Math.max(maxRowHeight, textHeight + 10);
+                        
+                        doc.text(data.toString(), x + 1, currentY + 5, {
+                            width: columnWidths[index] - 2,
+                            align: 'left'
+                        });
+                    });
 
-                    // Compliance Details
-                    doc.fontSize(10).text('Compliance Details:', 50, currentY);
-                    currentY += lineHeight;
-                    
-                    doc.fontSize(9).text(`Failure Code: ${transaction.failure_code || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Failure Message: ${transaction.failure_message || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Network Status: ${transaction.network_status || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Outcome Type: ${transaction.outcome_type || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Risk Level: ${transaction.risk_level || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Seller Message: ${transaction.seller_message || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight + 5;
+                    // Draw horizontal line between rows
+                    doc.moveTo(startX, currentY + maxRowHeight)
+                        .lineTo(
+                            startX + columnWidths.reduce((sum, w) => sum + w, 0),
+                            currentY + maxRowHeight
+                        )
+                        .stroke();
 
-                    // IP and Customer Information
-                    doc.fontSize(10).text('Customer & IP Information:', 50, currentY);
-                    currentY += lineHeight;
-                    
-                    doc.fontSize(9).text(`Customer IP: ${transaction.customer_ip || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Description: ${transaction.description || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Receipt Email: ${transaction.receipt_email || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight;
-                    doc.text(`Receipt URL: ${transaction.receipt_url || 'N/A'}`, 70, currentY);
-                    currentY += lineHeight + 10;
-
-                    // Add separator line
-                    doc.moveTo(50, currentY).lineTo(550, currentY).stroke();
-                    currentY += 10;
+                    currentY += maxRowHeight + 5; // Move to next row with dynamic height
                 });
 
                 doc.end();
