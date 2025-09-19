@@ -177,6 +177,25 @@ const DetailedTransactionView = ({
         return <Chip label={config.label} color={config.color} size="small" />;
     };
 
+    const getChargebackChip = (chargebackStatus, chargebackAmount) => {
+        if (!chargebackStatus || chargebackStatus === 'none') {
+            return <Chip label="None" color="default" size="small" />;
+        }
+        
+        if (chargebackStatus === 'disputed') {
+            return (
+                <Chip 
+                    icon={<WarningIcon />} 
+                    label={`$${chargebackAmount || 0}`} 
+                    color="error" 
+                    size="small" 
+                />
+            );
+        }
+        
+        return <Chip label={chargebackStatus} color="warning" size="small" />;
+    };
+
     // Filter transactions based on selected filters
     const filteredTransactions = transactions.filter(transaction => {
         if (filterStatus !== 'all') {
@@ -280,7 +299,7 @@ const DetailedTransactionView = ({
                     },
                 }}>
                     <Table sx={{ 
-                        minWidth: 1200,
+                        minWidth: 1600,
                         '& .MuiTableCell-root': {
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
@@ -297,6 +316,9 @@ const DetailedTransactionView = ({
                                 <TableCell sx={{ width: '120px' }}>Status</TableCell>
                                 <TableCell sx={{ width: '120px' }}>Risk Level</TableCell>
                                 <TableCell sx={{ width: '120px' }}>Network Status</TableCell>
+                                <TableCell sx={{ width: '150px' }}>Customer Name</TableCell>
+                                <TableCell sx={{ width: '180px' }}>Customer Email</TableCell>
+                                <TableCell sx={{ width: '120px' }}>Chargeback</TableCell>
                                 <TableCell sx={{ width: '150px' }}>Created</TableCell>
                                 <TableCell sx={{ width: '120px' }}>Customer IP</TableCell>
                                 <TableCell sx={{ width: '200px' }}>Account</TableCell>
@@ -354,6 +376,39 @@ const DetailedTransactionView = ({
                                             {getNetworkStatusChip(transaction.network_status)}
                                         </TableCell>
                                         <TableCell>
+                                            <Tooltip title={transaction.customer_name || 'N/A'} placement="top">
+                                                <Typography 
+                                                    variant="body2"
+                                                    sx={{ 
+                                                        wordBreak: 'break-word',
+                                                        fontSize: '0.875rem',
+                                                        lineHeight: 1.2,
+                                                        cursor: 'help'
+                                                    }}
+                                                >
+                                                    {transaction.customer_name || 'N/A'}
+                                                </Typography>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Tooltip title={transaction.customer_email || 'N/A'} placement="top">
+                                                <Typography 
+                                                    variant="body2"
+                                                    sx={{ 
+                                                        wordBreak: 'break-all',
+                                                        fontSize: '0.875rem',
+                                                        lineHeight: 1.2,
+                                                        cursor: 'help'
+                                                    }}
+                                                >
+                                                    {transaction.customer_email || 'N/A'}
+                                                </Typography>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell>
+                                            {getChargebackChip(transaction.chargeback_status, transaction.chargeback_amount)}
+                                        </TableCell>
+                                        <TableCell>
                                             {transaction.created}
                                         </TableCell>
                                         <TableCell>
@@ -392,7 +447,7 @@ const DetailedTransactionView = ({
                                     
                                     {/* Expanded Row with Compliance Details */}
                                     <TableRow>
-                                        <TableCell colSpan={10} sx={{ py: 0 }}>
+                                        <TableCell colSpan={13} sx={{ py: 0 }}>
                                             <Collapse in={expandedRows.has(transaction.id)} timeout="auto" unmountOnExit>
                                                 <Box sx={{ margin: 1 }}>
                                                     <Grid container spacing={2}>
@@ -514,6 +569,117 @@ const DetailedTransactionView = ({
                                                                                 {transaction.description || 'N/A'}
                                                                             </Typography>
                                                                         </Box>
+                                                                    </Box>
+                                                                </CardContent>
+                                                            </Card>
+                                                        </Grid>
+
+                                                        {/* Customer Details */}
+                                                        <Grid item xs={12} md={6}>
+                                                            <Card variant="outlined">
+                                                                <CardContent>
+                                                                    <Typography variant="h6" gutterBottom>
+                                                                        Customer Information
+                                                                    </Typography>
+                                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                                        <Box>
+                                                                            <Typography variant="caption" color="textSecondary">
+                                                                                Customer Name:
+                                                                            </Typography>
+                                                                            <Typography variant="body2">
+                                                                                {transaction.customer_name || 'N/A'}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Box>
+                                                                            <Typography variant="caption" color="textSecondary">
+                                                                                Customer Email:
+                                                                            </Typography>
+                                                                            <Typography variant="body2">
+                                                                                {transaction.customer_email || 'N/A'}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Box>
+                                                                            <Typography variant="caption" color="textSecondary">
+                                                                                Customer Phone:
+                                                                            </Typography>
+                                                                            <Typography variant="body2">
+                                                                                {transaction.customer_phone || 'N/A'}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Box>
+                                                                            <Typography variant="caption" color="textSecondary">
+                                                                                Customer ID:
+                                                                            </Typography>
+                                                                            <Typography variant="body2" fontFamily="monospace">
+                                                                                {transaction.customer_id || 'N/A'}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    </Box>
+                                                                </CardContent>
+                                                            </Card>
+                                                        </Grid>
+
+                                                        {/* Chargeback Details */}
+                                                        <Grid item xs={12} md={6}>
+                                                            <Card variant="outlined">
+                                                                <CardContent>
+                                                                    <Typography variant="h6" gutterBottom>
+                                                                        <WarningIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                                                                        Chargeback Information
+                                                                    </Typography>
+                                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                                        <Box>
+                                                                            <Typography variant="caption" color="textSecondary">
+                                                                                Chargeback Status:
+                                                                            </Typography>
+                                                                            <Typography variant="body2">
+                                                                                {transaction.chargeback_status === 'disputed' ? 'Disputed' : 'None'}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        {transaction.chargeback_status === 'disputed' && (
+                                                                            <>
+                                                                                <Box>
+                                                                                    <Typography variant="caption" color="textSecondary">
+                                                                                        Chargeback Amount:
+                                                                                    </Typography>
+                                                                                    <Typography variant="body2">
+                                                                                        ${transaction.chargeback_amount || 0} {transaction.chargeback_currency || ''}
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                                <Box>
+                                                                                    <Typography variant="caption" color="textSecondary">
+                                                                                        Chargeback Reason:
+                                                                                    </Typography>
+                                                                                    <Typography variant="body2">
+                                                                                        {transaction.chargeback_reason || 'N/A'}
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                                <Box>
+                                                                                    <Typography variant="caption" color="textSecondary">
+                                                                                        Chargeback Created:
+                                                                                    </Typography>
+                                                                                    <Typography variant="body2">
+                                                                                        {transaction.chargeback_created || 'N/A'}
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                                <Box>
+                                                                                    <Typography variant="caption" color="textSecondary">
+                                                                                        Evidence Due By:
+                                                                                    </Typography>
+                                                                                    <Typography variant="body2">
+                                                                                        {transaction.chargeback_evidence_due_by || 'N/A'}
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                                <Box>
+                                                                                    <Typography variant="caption" color="textSecondary">
+                                                                                        Status Details:
+                                                                                    </Typography>
+                                                                                    <Typography variant="body2">
+                                                                                        {transaction.chargeback_status_details || 'N/A'}
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                            </>
+                                                                        )}
                                                                     </Box>
                                                                 </CardContent>
                                                             </Card>

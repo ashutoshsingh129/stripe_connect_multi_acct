@@ -320,6 +320,18 @@ router.get(
                         balance_transaction_id: charge.balance_transaction || '',
                         fraud_details: charge.fraud_details || {},
                         metadata: charge.metadata || {},
+                        // Customer information from billing details
+                        customer_name: charge.billing_details?.name || '',
+                        customer_email: charge.billing_details?.email || '',
+                        customer_phone: charge.billing_details?.phone || '',
+                        // Chargeback information
+                        chargeback_status: charge.disputed ? 'disputed' : 'none',
+                        chargeback_reason: charge.dispute?.reason || '',
+                        chargeback_amount: charge.dispute?.amount ? charge.dispute.amount / 100 : 0,
+                        chargeback_currency: charge.dispute?.currency || '',
+                        chargeback_created: charge.dispute?.created ? moment.unix(charge.dispute.created).format('YYYY-MM-DD HH:mm:ss') : '',
+                        chargeback_evidence_due_by: charge.dispute?.evidence_details?.due_by ? moment.unix(charge.dispute.evidence_details.due_by).format('YYYY-MM-DD HH:mm:ss') : '',
+                        chargeback_status_details: charge.dispute?.status || '',
                         // IP address from various sources
                         customer_ip: charge.metadata?.customer_ip || 
                                    charge.metadata?.ip_address || 
@@ -361,6 +373,18 @@ router.get(
                         balance_transaction_id: '',
                         fraud_details: {},
                         metadata: pi.metadata || {},
+                        // Customer information from payment intent
+                        customer_name: '',
+                        customer_email: pi.receipt_email || '',
+                        customer_phone: '',
+                        // Chargeback information (payment intents don't have direct chargeback info)
+                        chargeback_status: 'none',
+                        chargeback_reason: '',
+                        chargeback_amount: 0,
+                        chargeback_currency: '',
+                        chargeback_created: '',
+                        chargeback_evidence_due_by: '',
+                        chargeback_status_details: '',
                         // IP address from PaymentIntent metadata
                         customer_ip: pi.metadata?.customer_ip || 
                                    pi.metadata?.ip_address || 
