@@ -22,6 +22,7 @@ import EmailExportModal from '../export/EmailExportModal';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorMessage from '../common/ErrorMessage';
 import DetailedTransactionView from '../reports/DetailedTransactionView';
+import SigmaQueryInterface from '../sigma/SigmaQueryInterface';
 
 const Dashboard = ({ user, onLogout }) => {
     // Form state
@@ -42,7 +43,7 @@ const Dashboard = ({ user, onLogout }) => {
 
     // Detailed transaction view state
     const [showDetailedView, setShowDetailedView] = useState(false);
-    const [viewMode, setViewMode] = useState('report'); // 'report' or 'details'
+    const [viewMode, setViewMode] = useState('report'); // 'report', 'details', or 'sigma'
     const [detailedViewLoading, setDetailedViewLoading] = useState(false);
 
     // Custom hooks
@@ -269,6 +270,13 @@ const Dashboard = ({ user, onLogout }) => {
         }
     };
 
+    // Handle Sigma button from ReportForm
+    const handleSigmaView = () => {
+        setViewMode('sigma');
+        setShowDetailedView(false);
+        setReport(null);
+    };
+
     const handleCloseDetailedView = () => {
         setShowDetailedView(false);
         setViewMode('report');
@@ -319,6 +327,7 @@ const Dashboard = ({ user, onLogout }) => {
                     onFormChange={handleFormChange}
                     onGenerateReport={handleSubmit}
                     onViewDetails={handleViewDetails}
+                    onSigmaView={handleSigmaView}
                     loading={loading}
                     detailedViewLoading={detailedViewLoading}
                     timezones={timezones}
@@ -342,6 +351,8 @@ const Dashboard = ({ user, onLogout }) => {
                                             handleSubmit();
                                         } else if (newMode === 'details') {
                                             handleViewDetails();
+                                        } else if (newMode === 'sigma') {
+                                            handleSigmaView();
                                         }
                                     }
                                 }}
@@ -353,6 +364,9 @@ const Dashboard = ({ user, onLogout }) => {
                                 </ToggleButton>
                                 <ToggleButton value="details" aria-label="view details">
                                     🔍 Details
+                                </ToggleButton>
+                                <ToggleButton value="sigma" aria-label="sigma queries">
+                                    📊 Sigma
                                 </ToggleButton>
                             </ToggleButtonGroup>
                         </Box>
@@ -437,6 +451,11 @@ const Dashboard = ({ user, onLogout }) => {
                         timezone={formData.timezone}
                         onClose={handleCloseDetailedView}
                     />
+                )}
+
+                {/* Sigma Query Interface - show when in sigma mode */}
+                {viewMode === 'sigma' && (
+                    <SigmaQueryInterface />
                 )}
 
                 {/* Email Export Modal */}

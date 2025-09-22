@@ -26,6 +26,7 @@ const ReportForm = ({
     onFormChange,
     onGenerateReport,
     onViewDetails,
+    onSigmaView,
     loading,
     detailedViewLoading,
     timezones,
@@ -392,6 +393,22 @@ const ReportForm = ({
                                 sx={{ minWidth: 200, py: 1.5 }}
                             >
                                 {detailedViewLoading ? 'Loading Details...' : 'View Details'}
+                            </Button>
+                            
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                size="large"
+                                onClick={onSigmaView}
+                                disabled={
+                                    loading ||
+                                    selectedAccounts.length === 0 ||
+                                    !formData.secretKey ||
+                                    !formData.publicKey
+                                }
+                                sx={{ minWidth: 200, py: 1.5 }}
+                            >
+                                📊 Sigma Queries
                             </Button>
                         </Box>
                     </Box>

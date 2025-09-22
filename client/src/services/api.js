@@ -76,6 +76,7 @@ export const API_ENDPOINTS = {
 
     // Validation
     VALIDATE_KEYS: '/api/validate-keys',
+
 };
 
 // Authentication functions
@@ -256,5 +257,6 @@ export const apiService = {
         return response;
     },
 };
+
 
 export default api;
