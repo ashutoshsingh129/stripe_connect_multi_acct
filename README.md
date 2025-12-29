@@ -1,5 +1,8 @@
 # Stripe Connect Multi-Account Reporting Application
 
+> **Working Branch**: `detailed-reporting-chargeback`  
+> This is the active development branch for the project.
+
 A comprehensive reporting application for Stripe Connect accounts that allows users to generate detailed reports, export data in multiple formats (CSV, Excel, PDF, Email, Google Sheets), and manage multiple Stripe Connect accounts from a single dashboard.
 
 ## 🚀 Features
