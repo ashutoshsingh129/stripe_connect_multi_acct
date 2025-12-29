@@ -220,7 +220,39 @@ REACT_APP_API_URL=http://localhost:5000
 
 ### 4. Database Schema Setup
 
-The application will automatically create necessary tables on first run. Ensure your PostgreSQL user has CREATE TABLE privileges.
+**⚠️ IMPORTANT: Database tables must be created manually before running the application.**
+
+Connect to your PostgreSQL database and run the following SQL command to create the `users` table:
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  stripe_id VARCHAR(255) UNIQUE,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  email VARCHAR(255),
+  name VARCHAR(255),
+  password_hash TEXT,
+  raw_data JSONB,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Steps to create the table:**
+
+1. Connect to your PostgreSQL database:
+   ```bash
+   psql -U stripe_user -d stripe_connect_db -h localhost
+   ```
+
+2. Run the CREATE TABLE query above
+
+3. Verify the table was created:
+   ```sql
+   \dt
+   ```
+
+**Note:** This step is **mandatory** and must be completed before starting the application. The application will not automatically create tables.
 
 ### 5. Build the Application
 
@@ -415,6 +447,37 @@ git pull origin main
 npm run install-all
 npm run build
 ```
+
+## 🔐 Security Code Updates Required
+
+The following security improvements are required for future releases:
+
+### Current Security Issues
+
+1. **Stripe Keys in LocalStorage**
+   - **Issue**: Stripe API keys are currently stored in browser localStorage
+   - **Risk**: Keys can be accessed via browser DevTools or XSS attacks
+   - **Required Fix**: Implement server-side key storage only. Keys should never be stored in client-side storage (localStorage, sessionStorage, cookies, etc.)
+
+2. **Login API Exposure**
+   - **Issue**: Login API requests are visible in browser network tab, exposing authentication credentials
+   - **Risk**: Credentials can be intercepted or logged by browser extensions, network monitoring tools, or malicious scripts
+   - **Required Fix**: 
+     - Implement request encryption for sensitive endpoints
+     - Use HTTPS-only connections in production
+     - Consider implementing additional security headers and request obfuscation
+     - Add rate limiting and brute-force protection for login endpoints
+
+### Recommended Security Enhancements
+
+- **Server-Side Key Management**: Store Stripe keys exclusively on the server after initial validation
+- **Request Encryption**: Encrypt sensitive API requests before transmission
+- **Secure Token Storage**: Use httpOnly cookies for JWT tokens instead of localStorage
+- **API Request Obfuscation**: Implement additional layers to prevent network inspection
+- **Rate Limiting**: Add rate limiting to authentication endpoints
+- **Security Headers**: Implement comprehensive security headers (CSP, HSTS, etc.)
+
+**Note**: These security improvements should be prioritized before production deployment to ensure sensitive financial data is properly protected.
 
 ---
 
